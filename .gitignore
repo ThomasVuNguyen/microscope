@@ -1,0 +1,39 @@
+# Captured media
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.gif
+
+# Thumbnail cache
+.thumbs/
+
+# Focus test outputs
+focus_test/
+focus_log.json
+
+# Camera tuning files
+imx519_af.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

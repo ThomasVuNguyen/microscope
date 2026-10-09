@@ -1,0 +1,6 @@
+# System packages (install via apt on Raspberry Pi OS):
+#   sudo apt install python3-picamera2 python3-libcamera python3-pil python3-numpy ffmpeg
+#
+# The following are typically already installed with picamera2:
+numpy
+Pillow
