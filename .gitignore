@@ -1,9 +1,4 @@
-# Captured media
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.tiff
+# Videos (large files, keep local)
 *.mp4
 *.avi
 *.mkv
