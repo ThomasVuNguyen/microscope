@@ -88,7 +88,7 @@ class StreamingOutput(io.BufferedIOBase):
 
 output = StreamingOutput()
 picam2 = None
-camera_lock = threading.Lock()
+camera_lock = threading.RLock()  # RLock: re-entrant so apply_all_controls() can be called while lock is held
 current_focus_pos = 1.60
 latest_capture_path = None
 recording_active = False
@@ -471,6 +471,29 @@ def change_stream_quality(qp):
         picam2.start_recording(encoder, FileOutput(output))
     logging.info("✅ [Quality] Now streaming at qp=%d", current_qp)
     return {"status": "ok", "qp": current_qp}
+
+
+def switch_stream_mode(width, height, qp):
+    """Switch resolution and quality in a single camera cycle."""
+    global current_resolution, current_qp
+    qp = max(2, min(31, qp))
+    with camera_lock:
+        logging.info("🔄 [Mode] Switching to %dx%d qp=%d...", width, height, qp)
+        picam2.stop_recording()
+        picam2.stop()
+        current_qp = qp
+        config = picam2.create_video_configuration(
+            main={"size": (width, height)},
+            transform=Transform(hflip=True, vflip=True)
+        )
+        picam2.configure(config)
+        picam2.start()
+        current_resolution = (width, height)
+        apply_all_controls()
+        encoder = LibavMjpegEncoder(framerate=30, qp=current_qp)
+        picam2.start_recording(encoder, FileOutput(output))
+    logging.info("✅ [Mode] Now streaming at %dx%d qp=%d", width, height, current_qp)
+    return {"status": "ok", "resolution": [width, height], "qp": current_qp}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1564,15 +1587,14 @@ class StreamingHandler(BaseHTTPRequestHandler):
             mode = qs.get("mode", ["fast"])[0]
             try:
                 if mode == "fast":
-                    change_stream_quality(20)
-                    res = change_resolution(640, 480)
+                    res = switch_stream_mode(640, 480, 20)
                     res["mode"] = "fast"
                 else:
-                    change_stream_quality(10)
-                    res = change_resolution(1280, 720)
+                    res = switch_stream_mode(1280, 720, 10)
                     res["mode"] = "quality"
                 self._json_response(res)
             except Exception as e:
+                logging.exception("perf_mode error")
                 self._json_response({"status": "error", "message": str(e)}, 500)
 
         # ─── API: Media List ───
