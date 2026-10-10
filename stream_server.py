@@ -292,10 +292,12 @@ def run_spot_autofocus(sx, sy, broad=False):
     with camera_lock:
         t0 = time.time()
         logging.info("🎯 [Click-to-Focus] Starting at (x=%.3f, y=%.3f)...", sx, sy)
+
+        # Stage 1: Coarse sweep across full range
         if broad:
-            coarse_pts = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.5, 7.0, 9.0, 12.0, 15.0]
+            coarse_pts = [float(x) for x in range(0, 21)]  # 0,1,2,...20
         else:
-            coarse_pts = [0.0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.6, 3.4, 4.5, 6.0]
+            coarse_pts = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
 
         best_pos, best_score = current_focus_pos, -1.0
         scores = {}
@@ -304,16 +306,19 @@ def run_spot_autofocus(sx, sy, broad=False):
             f = get_fresh_frame(skip_frames=2)
             s = compute_roi_sharpness(f, sx, sy)
             scores[p] = s
+            logging.info("  [AF] %.1f dpt → %.1f", p, s)
             if s > best_score:
                 best_score, best_pos = s, p
 
-        fine_pts = [round(best_pos + d, 2) for d in [-0.25, -0.15, -0.05, 0.05, 0.15, 0.25]]
-        fine_pts = [p for p in fine_pts if 0.0 <= p <= 32.0 and p not in scores]
+        # Stage 2: Fine sweep ±1.5 dpt around best
+        fine_pts = [round(best_pos + d * 0.3, 2) for d in range(-5, 6)]
+        fine_pts = [p for p in fine_pts if 0.0 <= p <= 20.0 and p not in scores]
         for p in fine_pts:
             picam2.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": float(p)})
             f = get_fresh_frame(skip_frames=2)
             s = compute_roi_sharpness(f, sx, sy)
             scores[p] = s
+            logging.info("  [AF fine] %.2f dpt → %.1f", p, s)
             if s > best_score:
                 best_score, best_pos = s, p
 
