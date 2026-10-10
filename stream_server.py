@@ -25,6 +25,7 @@ from picamera2.outputs import FileOutput
 from libcamera import controls, Transform
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+mimetypes.add_type("font/woff2", ".woff2")
 
 # ═══════════════════════════════════════════════════════════════
 # Streaming Output Buffer
@@ -540,189 +541,239 @@ PAGE_HTML = r"""<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Microscope</title>
     <style>
-        /* ── Reset & Variables ── */
+        /* ── Fonts ── */
+        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Medium.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
+        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-SemiBold.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
+        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Bold.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+
+        /* ── Reset & Tokens ── */
         *{box-sizing:border-box;margin:0;padding:0}
         :root{
-            /* Canvas — layered, never pure black */
-            --bg:#0e0e11;--surface:#141418;--elevated:#1a1a22;--inset:#0a0a0d;
-            /* Text hierarchy */
-            --text:#fafafa;--text2:#a1a1aa;--text3:#63636e;--text-muted:#45454d;
-            /* Borders — 0.5px hairline strategy */
-            --border:rgba(255,255,255,.08);--border-subtle:rgba(255,255,255,.05);
-            --border-strong:rgba(255,255,255,.14);
-            /* Accent — single signal color */
-            --accent:#3b82f6;--accent-h:#2563eb;--accent-dim:rgba(59,130,246,.10);
-            /* Status — functional only */
-            --green:#22c55e;--red:#ef4444;--red-dim:rgba(239,68,68,.08);
-            --amber:#f59e0b;
-            /* Radius — dual system */
-            --radius:8px;--radius-sm:6px;--radius-xs:4px;
-            /* Motion */
-            --ease:cubic-bezier(.37,1,.74,1);--ease-smooth:cubic-bezier(.16,1,.3,1);
-            --dur:125ms;
+            --bg:#0a0a0a;
+            --layer:#141414;
+            --layer-2:#1e1e1e;
+            --line:rgba(255,255,255,.08);
+            --text:#e5e5e5;
+            --muted:#999;
+            --faint:#777;
+            --accent:#6b8aff;
+            --accent-hover:#8ba3ff;
+            --green:#22c55e;
+            --red:#ef4444;
+            --font:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+            --shadow-btn:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px -1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+            --shadow-card:0 0 0 .5px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.12);
         }
 
         /* ── Base ── */
         body{
-            font-family:'Inter',system-ui,-apple-system,sans-serif;
+            font-family:var(--font);
             background:var(--bg);color:var(--text);
-            padding:16px;
-            display:flex;flex-direction:column;align-items:center;
-            min-height:100vh;
+            font-size:13px;font-weight:400;line-height:1.5;
             -webkit-font-smoothing:antialiased;
-            letter-spacing:-0.01em;
+            display:flex;flex-direction:column;align-items:center;
+            min-height:100vh;padding:0;
         }
-        .mono{
-            font-family:'GeistMono','JetBrains Mono','IBM Plex Mono','SF Mono',ui-monospace,monospace;
-            font-variant-numeric:tabular-nums;
-            letter-spacing:0;
+
+        /* ── Layout Shell ── */
+        .shell{
+            width:100%;max-width:960px;
+            padding:40px 24px 80px;
         }
 
         /* ── Header ── */
-        header{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin-bottom:12px}
-        .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text)}
-        .logo svg{color:var(--accent);flex-shrink:0}
-        .tabs{display:flex;gap:0;background:var(--surface);border-radius:var(--radius-sm);border:.5px solid var(--border)}
-        .tab-btn{
-            padding:7px 20px;border:none;background:transparent;
-            color:var(--text3);font-family:inherit;font-size:12px;font-weight:500;
-            cursor:pointer;border-radius:5px;transition:all var(--dur) var(--ease);
-            letter-spacing:-0.005em;
+        header{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:16px 0 24px;
+            border-bottom:1px solid var(--line);
+            margin-bottom:24px;
         }
-        .tab-btn+.tab-btn{border-left:.5px solid var(--border)}
-        .tab-btn.active{background:var(--accent);color:#fff;border-color:transparent}
-        .tab-btn:hover:not(.active){color:var(--text2)}
-        .tab-content{display:none;width:100%;max-width:960px;flex-direction:column;align-items:center}
+        .logo{
+            display:flex;align-items:center;gap:10px;
+            font-size:13px;font-weight:500;color:var(--text);
+            letter-spacing:0;
+        }
+        .logo svg{color:var(--accent);flex-shrink:0}
+        .logo .dot{
+            width:6px;height:6px;background:var(--accent);
+            display:inline-block;margin-right:2px;
+        }
+        .tabs{display:flex;gap:0}
+        .tab-btn{
+            padding:8px 20px;border:1px solid var(--line);
+            background:var(--layer);color:var(--muted);
+            font-family:var(--font);font-size:11px;font-weight:500;
+            cursor:pointer;border-radius:0;transition:all 120ms ease;
+            letter-spacing:.02em;text-transform:uppercase;
+        }
+        .tab-btn+.tab-btn{border-left:none}
+        .tab-btn.active{
+            background:var(--accent);color:#fff;
+            border-color:var(--accent);
+        }
+        .tab-btn:hover:not(.active){color:var(--text);background:var(--layer-2)}
+        .tab-content{display:none;width:100%;flex-direction:column;gap:8px}
         .tab-content.active{display:flex}
+
+        /* ── Section Title ── */
+        .section-title{
+            font-size:11px;font-weight:500;color:var(--faint);
+            letter-spacing:.06em;text-transform:uppercase;
+            padding:12px 0 8px;
+        }
 
         /* ── Stream Viewport ── */
         .stream-wrap{
-            position:relative;width:100%;background:var(--inset);
-            border-radius:var(--radius);overflow:hidden;aspect-ratio:16/9;
-            cursor:crosshair;border:.5px solid var(--border);
-            box-shadow:inset 0 1px 4px rgba(0,0,0,.4);
+            position:relative;width:100%;
+            background:#000;overflow:hidden;aspect-ratio:16/9;
+            cursor:crosshair;
+            border:1px solid var(--line);
+            border-radius:0;
         }
         canvas#view-canvas{width:100%;height:100%;display:block}
 
         /* ── HUD Overlay ── */
         .hud{
-            position:absolute;top:8px;left:8px;padding:3px 10px;
-            border-radius:var(--radius-xs);font-size:11px;font-weight:500;
-            letter-spacing:0;pointer-events:none;transition:all .2s var(--ease);
-            background:rgba(0,0,0,.55);color:var(--text2);
-            backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-            border:.5px solid var(--border);
-            font-family:'GeistMono','JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;
+            position:absolute;top:0;left:0;padding:6px 12px;
+            font-size:11px;font-weight:500;
+            pointer-events:none;transition:all .2s ease;
+            background:rgba(10,10,10,.75);color:var(--muted);
+            border-right:1px solid var(--line);
+            border-bottom:1px solid var(--line);
+            border-radius:0;
             font-variant-numeric:tabular-nums;
         }
-        .hud.busy{background:var(--accent-dim);color:var(--accent);border-color:rgba(59,130,246,.25)}
+        .hud.busy{background:rgba(107,138,255,.12);color:var(--accent);border-color:rgba(107,138,255,.25)}
 
         /* ── Recording Badge ── */
         .rec-dot{
-            position:absolute;top:8px;right:8px;display:none;align-items:center;gap:5px;
-            background:var(--red-dim);color:var(--red);padding:3px 10px;
-            border-radius:var(--radius-xs);font-size:10px;font-weight:600;
-            letter-spacing:.04em;text-transform:uppercase;
-            border:.5px solid rgba(239,68,68,.25);
-            font-family:'GeistMono','JetBrains Mono',ui-monospace,monospace;
+            position:absolute;top:0;right:0;display:none;align-items:center;gap:6px;
+            background:rgba(239,68,68,.08);color:var(--red);padding:6px 12px;
+            font-size:10px;font-weight:600;
+            letter-spacing:.06em;text-transform:uppercase;
+            border-left:1px solid rgba(239,68,68,.2);
+            border-bottom:1px solid rgba(239,68,68,.2);
+            border-radius:0;
         }
         .rec-dot::before{content:'';width:6px;height:6px;background:var(--red);border-radius:50%;animation:blink 1s infinite}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 
         /* ── Reticle ── */
         .reticle{
-            position:absolute;width:52px;height:52px;
-            border:.5px solid rgba(59,130,246,.45);border-radius:var(--radius-xs);
+            position:absolute;width:48px;height:48px;
+            border:1px solid rgba(107,138,255,.4);border-radius:0;
             transform:translate(-50%,-50%);pointer-events:none;
-            transition:all .15s var(--ease-smooth);opacity:.7;
+            transition:all .15s ease;opacity:.7;
         }
-        .reticle::before,.reticle::after{content:'';position:absolute;background:rgba(59,130,246,.45)}
-        .reticle::before{width:.5px;height:10px;left:50%;top:50%;transform:translate(-50%,-50%)}
-        .reticle::after{width:10px;height:.5px;left:50%;top:50%;transform:translate(-50%,-50%)}
-        .reticle.focusing{border-color:var(--accent);box-shadow:0 0 16px rgba(59,130,246,.3);animation:pulse .8s infinite alternate;opacity:1}
+        .reticle::before,.reticle::after{content:'';position:absolute;background:rgba(107,138,255,.4)}
+        .reticle::before{width:1px;height:12px;left:50%;top:50%;transform:translate(-50%,-50%)}
+        .reticle::after{width:12px;height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+        .reticle.focusing{border-color:var(--accent);box-shadow:0 0 20px rgba(107,138,255,.2);animation:pulse .8s infinite alternate;opacity:1}
         .reticle.focusing::before,.reticle.focusing::after{background:var(--accent)}
         .reticle.focused{border-color:var(--green);opacity:1}
         .reticle.focused::before,.reticle.focused::after{background:var(--green)}
-        @keyframes pulse{0%{transform:translate(-50%,-50%) scale(.97)}100%{transform:translate(-50%,-50%) scale(1.05)}}
+        @keyframes pulse{0%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1.06)}}
 
-        /* ── Sharpness Meter ── */
+        /* ── Meter Row ── */
         .meter{
-            width:100%;background:var(--surface);margin-top:6px;
-            padding:8px 12px;border-radius:var(--radius);
-            border:.5px solid var(--border);
-            display:flex;align-items:center;gap:10px;
+            width:100%;
+            min-height:48px;padding:10px 12px;
+            border:1px solid var(--line);
+            background:var(--layer);
+            border-radius:0;
+            display:flex;align-items:center;gap:12px;
         }
-        .meter-label{font-size:10px;color:var(--text3);white-space:nowrap;font-weight:500;letter-spacing:.03em;text-transform:uppercase}
-        .meter-track{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:1.5px;overflow:hidden}
-        .meter-fill{height:100%;width:0;background:var(--accent);border-radius:1.5px;transition:width .2s var(--ease)}
-        .meter .mono{font-size:11px;color:var(--accent)}
-        .meter-peak{font-size:10px;color:var(--text3)}
+        .meter-label{font-size:11px;color:var(--faint);white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+        .meter-track{flex:1;height:2px;background:rgba(255,255,255,.06);overflow:hidden}
+        .meter-fill{height:100%;width:0;background:var(--accent);transition:width .2s ease}
+        .meter .mono{font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums}
+        .meter-peak{font-size:11px;color:var(--faint)}
         .meter-reset{
-            background:none;border:.5px solid var(--border);color:var(--text3);
-            padding:2px 8px;border-radius:var(--radius-xs);font-size:10px;
-            cursor:pointer;font-family:inherit;transition:border-color var(--dur) var(--ease);
+            background:var(--layer-2);border:1px solid var(--line);color:var(--muted);
+            padding:4px 10px;border-radius:0;font-size:11px;
+            cursor:pointer;font-family:var(--font);transition:all 120ms ease;
         }
-        .meter-reset:hover{border-color:var(--border-strong)}
+        .meter-reset:hover{border-color:rgba(255,255,255,.16);color:var(--text);transform:translateY(-1px)}
 
         /* ── Focus Bar ── */
         .focus-bar{
-            width:100%;background:var(--surface);margin-top:6px;
-            padding:8px 12px;border-radius:var(--radius);
-            border:.5px solid var(--border);
-            display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+            width:100%;
+            min-height:48px;padding:10px 12px;
+            border:1px solid var(--line);
+            background:var(--layer);
+            border-radius:0;
+            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
         }
         .focus-bar input[type=range]{flex:1;min-width:100px}
 
-        /* ── Action Buttons ── */
-        .actions{width:100%;display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+        /* ── Buttons ── */
+        .actions{width:100%;display:flex;gap:6px;flex-wrap:wrap}
         .btn{
-            display:inline-flex;align-items:center;gap:5px;
-            padding:6px 12px;
-            border:.5px solid var(--border-strong);border-radius:var(--radius-sm);
-            background:var(--surface);color:var(--text2);
-            font-family:inherit;font-size:12px;font-weight:500;
-            cursor:pointer;transition:all var(--dur) var(--ease);
-            text-decoration:none;white-space:nowrap;letter-spacing:-0.005em;
+            display:inline-flex;align-items:center;gap:6px;
+            padding:8px 14px;
+            border:1px solid var(--line);border-radius:0;
+            background:var(--layer);color:var(--muted);
+            font-family:var(--font);font-size:11px;font-weight:500;
+            cursor:pointer;transition:all 120ms ease;
+            text-decoration:none;white-space:nowrap;
+            letter-spacing:.01em;
+            box-shadow:var(--shadow-btn);
         }
-        .btn:hover{border-color:var(--text3);color:var(--text);background:var(--elevated)}
-        .btn:active{transform:scale(.98)}
-        .btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+        .btn:hover{
+            border-color:rgba(255,255,255,.16);color:var(--text);
+            background:var(--layer-2);
+            transform:translateY(-1px);
+            box-shadow:var(--shadow-card);
+        }
+        .btn:active{transform:translateY(0)}
+        .btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
         .btn svg{width:14px;height:14px;flex-shrink:0}
         .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
-        .btn-primary:hover{background:var(--accent-h);border-color:var(--accent-h)}
-        .btn-danger{background:var(--red-dim);border-color:rgba(239,68,68,.2);color:var(--red)}
-        .btn-danger:hover{background:rgba(239,68,68,.14)}
-        .btn-sm{padding:4px 8px;font-size:11px}
-        .btn-nudge{padding:5px 8px;font-weight:500;font-size:11px;border-radius:var(--radius-xs)}
-        .btn-nudge .mono{font-size:11px}
+        .btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+        .btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:var(--red)}
+        .btn-danger:hover{background:rgba(239,68,68,.12);transform:translateY(-1px)}
+        .btn-sm{padding:5px 10px;font-size:10px}
+        .btn-nudge{padding:6px 10px;font-weight:500;font-size:11px;border-radius:0}
+        .btn-nudge .mono{font-size:11px;font-variant-numeric:tabular-nums}
         .actions .spacer{flex:1}
 
         /* ── Control Panels ── */
-        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px;width:100%;margin-top:6px}
-        .panel{background:var(--surface);border:.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;width:100%}
+        .panel{
+            background:linear-gradient(180deg,rgba(255,255,255,.04),transparent),var(--layer);
+            border:1px solid var(--line);
+            border-radius:0;overflow:hidden;
+        }
         .panel-head{
-            padding:8px 12px;font-size:12px;font-weight:600;
+            padding:12px 14px;font-size:11px;font-weight:600;
             color:var(--text);cursor:pointer;display:flex;align-items:center;
-            gap:7px;user-select:none;list-style:none;letter-spacing:-0.01em;
+            gap:8px;user-select:none;list-style:none;
+            letter-spacing:.02em;text-transform:uppercase;
+            min-height:48px;
         }
         .panel-head svg{width:14px;height:14px;color:var(--accent);flex-shrink:0}
         .panel-head::after{
             content:'';margin-left:auto;width:14px;height:14px;
-            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%2363636e' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M3.5 5.25l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
-            transition:transform .2s var(--ease);
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23777' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M3.5 5.25l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+            transition:transform .2s ease;
         }
         details[open] .panel-head::after{transform:rotate(180deg)}
         details.panel:not([open]) .panel-head{border-bottom:none}
-        .panel-body{padding:4px 12px 12px}
-        .row{display:flex;align-items:center;gap:7px;min-height:30px}
-        .row+.row{margin-top:2px}
-        .row label{min-width:74px;font-size:11px;color:var(--text3);font-weight:450;letter-spacing:-0.005em}
+        .panel-body{padding:4px 14px 14px}
+        .row{
+            display:flex;align-items:center;gap:8px;
+            min-height:36px;
+            padding:2px 0;
+        }
+        .row+.row{border-top:1px solid rgba(255,255,255,.04)}
+        .row label{min-width:80px;font-size:11px;color:var(--faint);font-weight:400}
         .row input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);cursor:pointer}
-        .row .val{min-width:46px;text-align:right;font-size:11px;color:var(--text2)}
+        .row .val{min-width:48px;text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
         .row select{
             flex:1;background:var(--bg);color:var(--text);
-            border:.5px solid var(--border);padding:4px 7px;
-            border-radius:var(--radius-xs);font-family:inherit;
+            border:1px solid var(--line);padding:6px 8px;
+            border-radius:0;font-family:var(--font);
             font-size:11px;cursor:pointer;outline:none;
         }
         .row select:focus{border-color:var(--accent)}
@@ -732,74 +783,113 @@ PAGE_HTML = r"""<!DOCTYPE html>
         .toggle input{opacity:0;width:0;height:0}
         .toggle span{
             position:absolute;inset:0;background:rgba(255,255,255,.08);
-            border-radius:999px;cursor:pointer;transition:.2s var(--ease);
-            border:.5px solid var(--border-strong);
+            border-radius:999px;cursor:pointer;transition:.2s ease;
+            border:1px solid var(--line);
         }
-        .toggle span::before{content:'';position:absolute;width:12px;height:12px;left:2.5px;bottom:2.5px;background:#fff;border-radius:50%;transition:.2s var(--ease)}
+        .toggle span::before{content:'';position:absolute;width:12px;height:12px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s ease}
         .toggle input:checked+span{background:var(--accent);border-color:var(--accent)}
         .toggle input:checked+span::before{transform:translateX(14px)}
 
         /* ── Status ── */
         #status-msg{
-            width:100%;max-width:960px;font-size:11px;color:var(--text3);
-            min-height:1.4rem;margin-top:8px;text-align:center;
-            font-family:'GeistMono','JetBrains Mono',ui-monospace,monospace;
+            width:100%;font-size:11px;color:var(--faint);
+            min-height:1.4rem;padding:12px 0;text-align:center;
+            border-top:1px solid var(--line);
             font-variant-numeric:tabular-nums;
         }
 
         /* ── Gallery ── */
-        .gallery-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;margin-bottom:8px}
+        .gallery-toolbar{
+            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+            width:100%;padding:12px 0;
+            border-bottom:1px solid var(--line);
+            margin-bottom:12px;
+        }
         .gallery-toolbar select{
-            background:var(--bg);color:var(--text);border:.5px solid var(--border);
-            padding:5px 8px;border-radius:var(--radius-xs);font-family:inherit;font-size:11px;
+            background:var(--layer);color:var(--text);border:1px solid var(--line);
+            padding:6px 10px;border-radius:0;font-family:var(--font);font-size:11px;
         }
-        .gallery-toolbar .stats{margin-left:auto;font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;font-family:'GeistMono','JetBrains Mono',ui-monospace,monospace}
-        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;width:100%}
-        .m-card{
-            background:var(--surface);border:.5px solid var(--border);
-            border-radius:var(--radius);overflow:hidden;
-            transition:all var(--dur) var(--ease);
-        }
-        .m-card:hover{border-color:var(--border-strong);box-shadow:0 4px 16px rgba(0,0,0,.2),0 1px 3px rgba(0,0,0,.1)}
-        .m-thumb{position:relative;width:100%;aspect-ratio:4/3;background:var(--inset);cursor:pointer;overflow:hidden}
-        .m-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .3s var(--ease-smooth)}
-        .m-card:hover .m-thumb img{transform:scale(1.03)}
-        .m-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}
-        .m-thumb .play svg{width:32px;height:32px;color:#fff;opacity:.85}
-        .m-info{padding:8px 10px 3px}
-        .m-name{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:450}
-        .m-meta{
-            font-size:10px;color:var(--text3);margin-top:2px;
-            font-family:'GeistMono','JetBrains Mono',ui-monospace,monospace;
+        .gallery-toolbar .stats{
+            margin-left:auto;font-size:11px;color:var(--faint);
             font-variant-numeric:tabular-nums;
         }
-        .m-actions{display:flex;gap:4px;padding:4px 10px 8px}
-        .m-actions .btn{padding:3px 7px;font-size:10px}
-        .empty{grid-column:1/-1;text-align:center;color:var(--text3);padding:48px 20px;font-size:13px}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;width:100%}
+        .m-card{
+            background:linear-gradient(180deg,rgba(255,255,255,.04),transparent),var(--layer);
+            border:1px solid var(--line);
+            border-radius:0;overflow:hidden;
+            transition:all 120ms ease;
+        }
+        .m-card:hover{
+            border-color:rgba(255,255,255,.16);
+            box-shadow:var(--shadow-card);
+            transform:translateY(-1px);
+        }
+        .m-thumb{position:relative;width:100%;aspect-ratio:4/3;background:#000;cursor:pointer;overflow:hidden}
+        .m-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
+        .m-card:hover .m-thumb img{transform:scale(1.02)}
+        .m-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
+        .m-thumb .play svg{width:32px;height:32px;color:#fff;opacity:.8}
+        .m-info{padding:10px 12px 4px}
+        .m-name{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
+        .m-meta{font-size:10px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+        .m-actions{display:flex;gap:4px;padding:6px 12px 10px}
+        .m-actions .btn{padding:4px 8px;font-size:10px}
+        .empty{grid-column:1/-1;text-align:center;color:var(--faint);padding:60px 20px;font-size:13px}
 
         /* ── Lightbox ── */
         .lb{
-            display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);
+            display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);
             z-index:1000;flex-direction:column;align-items:center;justify-content:center;
-            padding:20px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+            padding:20px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
         }
         .lb.open{display:flex}
         .lb-close{
-            position:absolute;top:12px;right:16px;width:32px;height:32px;
+            position:absolute;top:16px;right:20px;width:36px;height:36px;
             display:flex;align-items:center;justify-content:center;
-            border-radius:999px;background:rgba(255,255,255,.06);
-            border:.5px solid var(--border);color:#fff;font-size:1.1rem;
-            cursor:pointer;transition:background var(--dur) var(--ease);
+            border-radius:0;background:var(--layer);
+            border:1px solid var(--line);color:var(--muted);font-size:18px;
+            cursor:pointer;font-family:var(--font);transition:all 120ms ease;
         }
-        .lb-close:hover{background:rgba(255,255,255,.12)}
+        .lb-close:hover{background:var(--layer-2);color:var(--text);transform:translateY(-1px)}
         .lb-body{max-width:95vw;max-height:80vh}
-        .lb-body img,.lb-body video{max-width:100%;max-height:80vh;border-radius:var(--radius-sm);border:.5px solid var(--border)}
-        .lb-bar{display:flex;align-items:center;gap:14px;margin-top:12px;font-size:12px;color:var(--text2)}
+        .lb-body img,.lb-body video{max-width:100%;max-height:80vh;border-radius:0;border:1px solid var(--line)}
+        .lb-bar{display:flex;align-items:center;gap:16px;margin-top:16px;font-size:11px;color:var(--muted)}
         .lb-bar a{color:var(--accent);text-decoration:none}
+        .lb-bar a:hover{color:var(--accent-hover)}
+
+        /* ── Dot Matrix Decoration ── */
+        .dot-matrix{
+            position:relative;
+        }
+        .dot-matrix::before{
+            content:'';position:absolute;top:0;right:0;width:48px;height:48px;
+            opacity:.15;
+            background-image:radial-gradient(circle,var(--muted) 1px,transparent 1px);
+            background-size:6px 6px;
+            pointer-events:none;
+        }
+
+        /* ── Range Input Styling ── */
+        input[type=range]{
+            -webkit-appearance:none;appearance:none;
+            height:2px;background:var(--line);outline:none;
+            border-radius:0;
+        }
+        input[type=range]::-webkit-slider-thumb{
+            -webkit-appearance:none;appearance:none;
+            width:12px;height:12px;background:var(--accent);
+            border-radius:0;cursor:pointer;border:none;
+        }
+        input[type=range]::-moz-range-thumb{
+            width:12px;height:12px;background:var(--accent);
+            border-radius:0;cursor:pointer;border:none;
+        }
 
         /* ── Responsive ── */
         @media(max-width:480px){
-            header{flex-direction:column;gap:8px}
+            .shell{padding:20px 12px 40px}
+            header{flex-direction:column;gap:12px;align-items:flex-start}
             .focus-bar{gap:4px}
             .btn-nudge{padding:4px 6px;font-size:10px}
         }
@@ -807,19 +897,17 @@ PAGE_HTML = r"""<!DOCTYPE html>
     </style>
 </head>
 <body>
+<div class="shell">
 
 <header>
     <div class="logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-        Microscope
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        microscope
     </div>
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('live',this)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>Live
-        </button>
-        <button class="tab-btn" onclick="switchTab('gallery',this)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-3.09-3.09a2 2 0 00-2.82 0L6 21"/></svg>Gallery
-        </button>
+        <button class="tab-btn active" onclick="switchTab('live',this)">live</button>
+        <button class="tab-btn" onclick="switchTab('gallery',this)">gallery</button>
     </div>
 </header>
 
@@ -827,55 +915,56 @@ PAGE_HTML = r"""<!DOCTYPE html>
 <div id="tab-live" class="tab-content active">
     <div class="stream-wrap" id="container">
         <canvas id="view-canvas"></canvas>
-        <div class="hud" id="hud">Connecting...</div>
-        <div class="rec-dot" id="rec-badge">REC</div>
+        <div class="hud" id="hud">connecting...</div>
+        <div class="rec-dot" id="rec-badge">rec</div>
         <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
     </div>
 
-    <div class="meter">
-        <span class="meter-label">Sharpness</span>
+    <div class="meter dot-matrix">
+        <span class="meter-label">sharpness</span>
         <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
         <span class="mono" id="sharp-val">0.0</span>
         <span class="meter-peak">peak <span class="mono" id="peak-val">0.0</span></span>
-        <button class="meter-reset" onclick="fetch('/api/reset_peak')">Reset</button>
+        <button class="meter-reset" onclick="fetch('/api/reset_peak')">reset</button>
     </div>
 
     <div class="focus-bar">
-        <span style="font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.03em;text-transform:uppercase">Focus</span>
+        <span style="font-size:10px;font-weight:500;color:var(--faint);letter-spacing:.04em;text-transform:uppercase">focus</span>
         <button class="btn btn-nudge" onclick="nudgeFocus(-0.20)"><span class="mono">−.20</span></button>
         <button class="btn btn-nudge" onclick="nudgeFocus(-0.05)"><span class="mono">−.05</span></button>
         <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
         <span class="mono val" id="focus-label" style="min-width:42px;text-align:center;color:var(--text)">1.60</span>
-        <span style="font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.03em;text-transform:uppercase">dpt</span>
+        <span style="font-size:10px;font-weight:500;color:var(--faint);letter-spacing:.04em;text-transform:uppercase">dpt</span>
         <button class="btn btn-nudge" onclick="nudgeFocus(0.05)"><span class="mono">+.05</span></button>
         <button class="btn btn-nudge" onclick="nudgeFocus(0.20)"><span class="mono">+.20</span></button>
     </div>
 
     <div class="actions">
         <button class="btn" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>Autofocus
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>autofocus
         </button>
         <button class="btn" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Broad Scan
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>broad scan
         </button>
         <div class="spacer"></div>
         <button class="btn btn-primary" id="btn-snap" onclick="capture16MP()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Capture 16MP
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>capture 16mp
         </button>
         <button class="btn" id="btn-rec" onclick="toggleRecording()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>record
         </button>
         <a class="btn" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>download
         </a>
     </div>
 
     <!-- ── Control Panels ── -->
+    <div class="section-title">controls</div>
     <div class="grid">
         <details class="panel" open>
             <summary class="panel-head">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-                Exposure
+                exposure
             </summary>
             <div class="panel-body">
                 <div class="row"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
@@ -890,7 +979,7 @@ PAGE_HTML = r"""<!DOCTYPE html>
         <details class="panel" open>
             <summary class="panel-head">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
-                White Balance
+                white balance
             </summary>
             <div class="panel-body">
                 <div class="row"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
@@ -903,7 +992,7 @@ PAGE_HTML = r"""<!DOCTYPE html>
         <details class="panel" open>
             <summary class="panel-head">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
-                Image
+                image
             </summary>
             <div class="panel-body">
                 <div class="row"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val mono" id="v-brightness">0.00</span></div>
@@ -916,14 +1005,14 @@ PAGE_HTML = r"""<!DOCTYPE html>
         <details class="panel">
             <summary class="panel-head">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                Advanced
+                advanced
             </summary>
             <div class="panel-body">
                 <div class="row"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
                 <div class="row"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
                 <div class="row"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 × 480</option><option value="1280x720" selected>1280 × 720</option><option value="1920x1080">1920 × 1080</option></select></div>
                 <div class="row"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val mono" id="v-zoom">1.0x</span></div>
-                <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn btn-sm" onclick="resetDefaults()">Reset All Defaults</button></div>
+                <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn btn-sm" onclick="resetDefaults()">reset all defaults</button></div>
             </div>
         </details>
     </div>
@@ -936,7 +1025,7 @@ PAGE_HTML = r"""<!DOCTYPE html>
     <div class="gallery-toolbar">
         <select id="gallery-sort" onchange="loadGallery()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest First</option><option value="name">By Name</option></select>
         <select id="gallery-type" onchange="loadGallery()"><option value="all">All Files</option><option value="image">Images Only</option><option value="video">Videos Only</option></select>
-        <button class="btn btn-sm" onclick="loadGallery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Refresh</button>
+        <button class="btn btn-sm" onclick="loadGallery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>refresh</button>
         <span class="stats" id="gallery-stats"></span>
     </div>
     <div class="gallery-grid" id="gallery-grid"></div>
@@ -948,11 +1037,13 @@ PAGE_HTML = r"""<!DOCTYPE html>
     <div class="lb-body" id="lightbox-content"></div>
     <div class="lb-bar">
         <span id="lb-name"></span>
-        <span id="lb-size" style="color:var(--text3)"></span>
-        <a id="lb-download" href="#" download>Download</a>
-        <button class="btn btn-danger btn-sm" id="lb-delete" onclick="deleteLightboxFile()">Delete</button>
+        <span id="lb-size" style="color:var(--faint)"></span>
+        <a id="lb-download" href="#" download>download</a>
+        <button class="btn btn-danger btn-sm" id="lb-delete" onclick="deleteLightboxFile()">delete</button>
     </div>
 </div>
+
+</div><!-- /.shell -->
 
 <script>
 const canvas=document.getElementById('view-canvas'),ctx=canvas.getContext('2d'),hud=document.getElementById('hud'),container=document.getElementById('container'),reticle=document.getElementById('reticle'),statusMsg=document.getElementById('status-msg'),recBadge=document.getElementById('rec-badge');
@@ -979,7 +1070,7 @@ function setControlsDisabled(d){document.querySelectorAll('.actions .btn').forEa
 
 function capture16MP(){if(isBusy)return;isBusy=true;statusMsg.innerText='Capturing 16MP still...';hud.innerText='Capturing...';setControlsDisabled(true);fetch('/api/capture_16mp').then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);hud.innerText=d.size_mb+' MB captured';statusMsg.innerText='Saved: '+d.name+' ('+d.size_mb+' MB) in '+d.duration+'s';document.getElementById('btn-dl').style.display='inline-flex';document.getElementById('btn-dl').href='/download_latest?t='+Date.now()}).catch(err=>{isBusy=false;setControlsDisabled(false);statusMsg.innerText='Capture error: '+err})}
 
-function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record';b.classList.remove('btn-danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop';b.classList.add('btn-danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
+function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>record';b.classList.remove('btn-danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>stop';b.classList.add('btn-danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
 
 function changeResolution(v){const[w,h]=v.split('x').map(Number);statusMsg.innerText='Switching to '+w+'\u00d7'+h+'...';fetch('/api/resolution?width='+w+'&height='+h).then(r=>r.json()).then(d=>{statusMsg.innerText='Resolution: '+d.resolution[0]+'\u00d7'+d.resolution[1]}).catch(err=>{statusMsg.innerText='Error: '+err})}
 function resetDefaults(){fetch('/api/reset_defaults').then(r=>r.json()).then(()=>{statusMsg.innerText='All controls reset';setTimeout(syncControlsFromServer,200)})}
@@ -995,7 +1086,7 @@ document.querySelectorAll('input[type=range]').forEach(sl=>{sl.addEventListener(
 document.addEventListener('mouseup',()=>{setTimeout(()=>{pollingPaused=false},300)});document.addEventListener('touchend',()=>{setTimeout(()=>{pollingPaused=false},300)});
 syncControlsFromServer();
 
-function loadGallery(){fetch('/api/media').then(r=>r.json()).then(files=>{const sort=document.getElementById('gallery-sort').value;const tf=document.getElementById('gallery-type').value;if(tf!=='all')files=files.filter(f=>f.type===tf);if(sort==='oldest')files.sort((a,b)=>a.mtime-b.mtime);else if(sort==='largest')files.sort((a,b)=>b.size-a.size);else if(sort==='name')files.sort((a,b)=>a.name.localeCompare(b.name));const totalMB=files.reduce((s,f)=>s+f.size_mb,0).toFixed(1);document.getElementById('gallery-stats').innerText=files.length+' files \u00b7 '+totalMB+' MB';const grid=document.getElementById('gallery-grid');grid.innerHTML='';if(!files.length){grid.innerHTML='<div class="empty">No media files found</div>';return}files.forEach(f=>{const c=document.createElement('div');c.className='m-card';const iv=f.type==='video';c.innerHTML='<div class="m-thumb" onclick="openLightbox(\''+f.name.replace(/'/g,"\\'")+'\','+iv+')"><img src="/api/thumb/'+encodeURIComponent(f.name)+'" loading="lazy" onerror="this.style.display=\'none\'">'+(iv?'<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>':'')+'</div><div class="m-info"><div class="m-name" title="'+f.name+'">'+f.name+'</div><div class="m-meta">'+f.size_mb+' MB \u00b7 '+f.date+'</div></div><div class="m-actions"><a class="btn" href="/media/'+encodeURIComponent(f.name)+'" download>Download</a><button class="btn btn-danger" onclick="event.stopPropagation();deleteFile(\''+f.name.replace(/'/g,"\\'")+'\')">Delete</button></div>';grid.appendChild(c)})}).catch(err=>{document.getElementById('gallery-grid').innerHTML='<div class="empty">Error loading gallery</div>'})}
+function loadGallery(){fetch('/api/media').then(r=>r.json()).then(files=>{const sort=document.getElementById('gallery-sort').value;const tf=document.getElementById('gallery-type').value;if(tf!=='all')files=files.filter(f=>f.type===tf);if(sort==='oldest')files.sort((a,b)=>a.mtime-b.mtime);else if(sort==='largest')files.sort((a,b)=>b.size-a.size);else if(sort==='name')files.sort((a,b)=>a.name.localeCompare(b.name));const totalMB=files.reduce((s,f)=>s+f.size_mb,0).toFixed(1);document.getElementById('gallery-stats').innerText=files.length+' files \u00b7 '+totalMB+' MB';const grid=document.getElementById('gallery-grid');grid.innerHTML='';if(!files.length){grid.innerHTML='<div class="empty">No media files found</div>';return}files.forEach(f=>{const c=document.createElement('div');c.className='m-card';const iv=f.type==='video';c.innerHTML='<div class="m-thumb" onclick="openLightbox(\''+f.name.replace(/'/g,"\\'")+"',"+iv+')"><img src="/api/thumb/'+encodeURIComponent(f.name)+'" loading="lazy" onerror="this.style.display=\'none\'">'+(iv?'<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>':'')+'</div><div class="m-info"><div class="m-name" title="'+f.name+'">'+f.name+'</div><div class="m-meta">'+f.size_mb+' MB \u00b7 '+f.date+'</div></div><div class="m-actions"><a class="btn" href="/media/'+encodeURIComponent(f.name)+'" download>download</a><button class="btn btn-danger" onclick="event.stopPropagation();deleteFile(\''+f.name.replace(/'/g,"\\'")+'\')">delete</button></div>';grid.appendChild(c)})}).catch(err=>{document.getElementById('gallery-grid').innerHTML='<div class="empty">Error loading gallery</div>'})}
 
 function openLightbox(n,iv){currentLightboxFile=n;const c=document.getElementById('lightbox-content');const u='/media/'+encodeURIComponent(n);c.innerHTML=iv?'<video src="'+u+'" controls autoplay style="max-width:100%;max-height:80vh"></video>':'<img src="'+u+'">';document.getElementById('lb-name').innerText=n;document.getElementById('lb-download').href=u;document.getElementById('lb-download').download=n;document.getElementById('lightbox').classList.add('open');fetch('/api/media').then(r=>r.json()).then(files=>{const f=files.find(x=>x.name===n);if(f)document.getElementById('lb-size').innerText=f.size_mb+' MB \u00b7 '+f.date})}
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.getElementById('lightbox-content').innerHTML='';currentLightboxFile=null}
@@ -1013,7 +1104,7 @@ class StreamingHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format, *args):
-        if len(args) > 0 and any(skip in str(args[0]) for skip in ["/stream.mjpg", "/api/metrics", "/api/thumb"]):
+        if len(args) > 0 and any(skip in str(args[0]) for skip in ["/stream.mjpg", "/api/metrics", "/api/thumb", "/assets/"]):
             return
         logging.info("%s - %s", self.address_string(), format % args)
 
@@ -1259,6 +1350,20 @@ class StreamingHandler(BaseHTTPRequestHandler):
                     self._json_response(delete_media_file(filename))
             else:
                 self._json_response({"status": "error", "message": "No file specified"}, 400)
+
+        # ─── Static Assets (fonts etc.) ───
+        elif path.startswith("/assets/"):
+            filename = unquote(path[8:])
+            if ".." in filename or "/" in filename:
+                self.send_error(400, "Bad filename")
+                return
+            assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+            filepath = os.path.join(assets_dir, filename)
+            realpath = os.path.realpath(filepath)
+            if realpath.startswith(os.path.realpath(assets_dir)) and os.path.exists(filepath):
+                self._serve_file(filepath, inline=True)
+            else:
+                self.send_error(404, "Not found")
 
         # ─── Media File Download ───
         elif path.startswith("/media/"):
