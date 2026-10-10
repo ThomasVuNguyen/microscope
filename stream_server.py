@@ -585,7 +585,7 @@ PAGE_HTML = r"""<!DOCTYPE html>
     [data-page="microscope"] a:hover { text-decoration: none; }
 
     /* ─── CONTAINER ─── */
-    .s-container { width: 100%; max-width: 80rem; margin: 0 auto; }
+    .s-container { width: 100%; max-width: 90rem; margin: 0 auto; }
 
     /* ─── HEADER ─── */
     .s-header {
@@ -664,6 +664,23 @@ PAGE_HTML = r"""<!DOCTYPE html>
       -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H2V2H0V0Z' fill='black'/%3E%3C/svg%3E");
       -webkit-mask-repeat: repeat; -webkit-mask-size: 6px 6px;
     }
+
+    /* ─── LIVE TWO-COLUMN LAYOUT ─── */
+    .s-live-grid {
+      display: grid; grid-template-columns: 1fr 360px; gap: 0; width: 100%;
+    }
+    .s-live-main { min-width: 0; }
+    .s-live-sidebar {
+      position: sticky; top: 72px; align-self: start;
+      max-height: calc(100vh - 72px); overflow-y: auto;
+      border-left: 1px solid var(--s-line);
+      scrollbar-width: thin; scrollbar-color: var(--s-line) transparent;
+    }
+    .s-live-sidebar::-webkit-scrollbar { width: 4px; }
+    .s-live-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .s-live-sidebar::-webkit-scrollbar-thumb { background: var(--s-line); }
+    .s-live-sidebar .s-panel { border-left: 0; border-right: 0; }
+    .s-live-sidebar .s-panel + .s-panel { border-top: 0; }
 
     /* ─── SECTIONS ─── */
     .s-section {
@@ -984,6 +1001,17 @@ PAGE_HTML = r"""<!DOCTYPE html>
     }
 
     /* ─── MOBILE ─── */
+    @media (max-width: 79.99rem) {
+      .s-live-grid { grid-template-columns: 1fr 320px; }
+    }
+    @media (max-width: 63.99rem) {
+      .s-live-grid { grid-template-columns: 1fr; }
+      .s-live-sidebar {
+        position: static; max-height: none; overflow-y: visible;
+        border-left: 0; border-top: 1px solid var(--s-line);
+      }
+      .s-live-sidebar .s-panel { border-left: 1px solid var(--s-line); border-right: 1px solid var(--s-line); }
+    }
     @media (max-width: 47.99rem) {
       .s-section { padding: 48px 16px; }
       .s-section-title { font-size: 20px; }
@@ -1037,132 +1065,132 @@ PAGE_HTML = r"""<!DOCTYPE html>
 <!-- ═══ LIVE TAB ═══ -->
 <div id="tab-live" class="tab-content active">
 
-<!-- ─── LIVE FEED ─── -->
-<section class="s-section" style="box-shadow: 0 -1px var(--s-line), inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line);">
-  <h2 class="s-section-title"><strong>Live Feed.</strong> <span>MJPEG stream from IMX519 sensor.</span></h2>
+<section class="s-section" style="box-shadow: 0 -1px var(--s-line), inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line); padding: 40px 0 0;">
+  <h2 class="s-section-title" style="padding: 0 40px;"><strong>Live Feed.</strong> <span>MJPEG stream with real-time controls.</span></h2>
 
-  <div class="s-viewport" id="container">
-    <canvas id="view-canvas"></canvas>
-    <div class="hud" id="hud">Connecting...</div>
-    <div class="rec-dot" id="rec-badge">REC</div>
-    <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
-  </div>
+  <div class="s-live-grid">
+    <!-- ── LEFT: Feed ── -->
+    <div class="s-live-main" style="padding: 0 0 40px 40px;">
+      <div class="s-viewport" id="container">
+        <canvas id="view-canvas"></canvas>
+        <div class="hud" id="hud">Connecting...</div>
+        <div class="rec-dot" id="rec-badge">REC</div>
+        <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
+      </div>
 
-  <!-- Sharpness meter as data-table row -->
-  <div class="s-table">
-    <div class="s-row s-meter-row">
-      <span class="s-label">SHARPNESS</span>
-      <div class="s-meter-track"><div id="meter-fill" class="s-meter-fill"></div></div>
-      <span class="s-value" id="sharp-val" style="color:var(--s-accent)">0.0</span>
-      <span style="color:var(--s-faint);font-size:11px">peak <span id="peak-val" style="font-variant-numeric:tabular-nums">0.0</span></span>
-      <button class="btn" onclick="fetch('/api/reset_peak')">Reset</button>
+      <!-- Sharpness meter -->
+      <div class="s-table">
+        <div class="s-row s-meter-row">
+          <span class="s-label">SHARPNESS</span>
+          <div class="s-meter-track"><div id="meter-fill" class="s-meter-fill"></div></div>
+          <span class="s-value" id="sharp-val" style="color:var(--s-accent)">0.0</span>
+          <span style="color:var(--s-faint);font-size:11px">peak <span id="peak-val" style="font-variant-numeric:tabular-nums">0.0</span></span>
+          <button class="btn" onclick="fetch('/api/reset_peak')">Reset</button>
+        </div>
+      </div>
+
+      <!-- Focus -->
+      <div class="s-table" style="margin-top:4px">
+        <div class="s-row s-focus-row">
+          <span class="s-label">FOCUS</span>
+          <div style="display:flex;gap:4px">
+            <button class="s-nudge" onclick="nudgeFocus(-0.20)">\u2212.20</button>
+            <button class="s-nudge" onclick="nudgeFocus(-0.05)">\u2212.05</button>
+          </div>
+          <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
+          <span class="s-value" id="focus-label" style="color:var(--s-text)">1.60</span>
+          <span class="s-label">dpt</span>
+          <div style="display:flex;gap:4px">
+            <button class="s-nudge" onclick="nudgeFocus(0.05)">+.05</button>
+            <button class="s-nudge" onclick="nudgeFocus(0.20)">+.20</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="s-cards">
+        <button class="s-card" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+          Autofocus
+        </button>
+        <button class="s-card" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          Broad Scan
+        </button>
+        <button class="s-card primary" id="btn-snap" onclick="capture16MP()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Capture 16MP
+        </button>
+        <button class="s-card" id="btn-rec" onclick="toggleRecording()">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>
+          Record
+        </button>
+        <a class="s-card" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+      </div>
+
+      <div id="status-msg"></div>
     </div>
-  </div>
 
-  <!-- Focus as data-table row -->
-  <div class="s-table" style="margin-top:4px">
-    <div class="s-row s-focus-row">
-      <span class="s-label">FOCUS</span>
-      <div style="display:flex;gap:4px">
-        <button class="s-nudge" onclick="nudgeFocus(-0.20)">−.20</button>
-        <button class="s-nudge" onclick="nudgeFocus(-0.05)">−.05</button>
-      </div>
-      <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
-      <span class="s-value" id="focus-label" style="color:var(--s-text)">1.60</span>
-      <span class="s-label">dpt</span>
-      <div style="display:flex;gap:4px">
-        <button class="s-nudge" onclick="nudgeFocus(0.05)">+.05</button>
-        <button class="s-nudge" onclick="nudgeFocus(0.20)">+.20</button>
-      </div>
+    <!-- ── RIGHT: Controls Sidebar ── -->
+    <div class="s-live-sidebar">
+      <details class="s-panel" open>
+        <summary class="s-panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+          Exposure
+        </summary>
+        <div class="s-panel-body">
+          <div class="s-ctrl s-ctrl-wide"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
+          <div class="s-ctrl ae-manual"><label>Exposure \u00b5s</label><input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)"><span class="val" id="v-exposure">20000</span></div>
+          <div class="s-ctrl ae-manual"><label>Gain</label><input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)"><span class="val" id="v-gain">1.0</span></div>
+          <div class="s-ctrl ae-auto"><label>EV Comp</label><input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)"><span class="val" id="v-ev">0.0</span></div>
+          <div class="s-ctrl s-ctrl-wide ae-auto"><label>Metering</label><select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)"><option value="CentreWeighted" selected>Centre-Weighted</option><option value="Spot">Spot</option><option value="Matrix">Matrix</option></select></div>
+          <div class="s-ctrl s-ctrl-wide ae-auto"><label>Mode</label><select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)"><option value="Normal" selected>Normal</option><option value="Short">Short</option><option value="Long">Long</option></select></div>
+        </div>
+      </details>
+
+      <details class="s-panel" open>
+        <summary class="s-panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+          White Balance
+        </summary>
+        <div class="s-panel-body">
+          <div class="s-ctrl s-ctrl-wide"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
+          <div class="s-ctrl s-ctrl-wide awb-auto"><label>Preset</label><select id="sel-awb" onchange="setCtrl('AwbMode',this.value)"><option value="Auto" selected>Auto</option><option value="Daylight">Daylight</option><option value="Cloudy">Cloudy</option><option value="Tungsten">Tungsten</option><option value="Fluorescent">Fluorescent</option><option value="Indoor">Indoor</option><option value="Incandescent">Incandescent</option></select></div>
+          <div class="s-ctrl awb-manual"><label>Red Gain</label><input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)"><span class="val" id="v-rgain">2.00</span></div>
+          <div class="s-ctrl awb-manual"><label>Blue Gain</label><input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)"><span class="val" id="v-bgain">2.00</span></div>
+        </div>
+      </details>
+
+      <details class="s-panel" open>
+        <summary class="s-panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
+          Image
+        </summary>
+        <div class="s-panel-body">
+          <div class="s-ctrl"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val" id="v-brightness">0.00</span></div>
+          <div class="s-ctrl"><label>Contrast</label><input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)"><span class="val" id="v-contrast">1.00</span></div>
+          <div class="s-ctrl"><label>Saturation</label><input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)"><span class="val" id="v-saturation">1.00</span></div>
+          <div class="s-ctrl"><label>Sharpness</label><input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)"><span class="val" id="v-sharpness">1.00</span></div>
+        </div>
+      </details>
+
+      <details class="s-panel">
+        <summary class="s-panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Advanced
+        </summary>
+        <div class="s-panel-body">
+          <div class="s-ctrl s-ctrl-wide"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
+          <div class="s-ctrl s-ctrl-wide"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
+          <div class="s-ctrl s-ctrl-wide"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 \u00d7 480</option><option value="1280x720" selected>1280 \u00d7 720</option><option value="1920x1080">1920 \u00d7 1080</option></select></div>
+          <div class="s-ctrl"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val" id="v-zoom">1.0x</span></div>
+          <div class="s-ctrl s-ctrl-right" style="margin-top:4px"><span></span><button class="btn" onclick="resetDefaults()">Reset All Defaults</button></div>
+        </div>
+      </details>
     </div>
-  </div>
-
-  <!-- Actions as leader cards -->
-  <div class="s-cards">
-    <button class="s-card" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
-      Autofocus
-    </button>
-    <button class="s-card" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-      Broad Scan
-    </button>
-    <button class="s-card primary" id="btn-snap" onclick="capture16MP()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      Capture 16MP
-    </button>
-    <button class="s-card" id="btn-rec" onclick="toggleRecording()">
-      <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>
-      Record
-    </button>
-    <a class="s-card" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download
-    </a>
-  </div>
-
-  <div id="status-msg"></div>
-</section>
-
-<!-- ─── CONTROLS ─── -->
-<section class="s-section">
-  <h2 class="s-section-title"><strong>Controls.</strong> <span>Camera exposure, white balance, and image settings.</span></h2>
-
-  <div class="s-panels">
-    <details class="s-panel" open>
-      <summary class="s-panel-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-        Exposure
-      </summary>
-      <div class="s-panel-body">
-        <div class="s-ctrl s-ctrl-wide"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
-        <div class="s-ctrl ae-manual"><label>Exposure µs</label><input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)"><span class="val" id="v-exposure">20000</span></div>
-        <div class="s-ctrl ae-manual"><label>Gain</label><input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)"><span class="val" id="v-gain">1.0</span></div>
-        <div class="s-ctrl ae-auto"><label>EV Comp</label><input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)"><span class="val" id="v-ev">0.0</span></div>
-        <div class="s-ctrl s-ctrl-wide ae-auto"><label>Metering</label><select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)"><option value="CentreWeighted" selected>Centre-Weighted</option><option value="Spot">Spot</option><option value="Matrix">Matrix</option></select></div>
-        <div class="s-ctrl s-ctrl-wide ae-auto"><label>Mode</label><select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)"><option value="Normal" selected>Normal</option><option value="Short">Short</option><option value="Long">Long</option></select></div>
-      </div>
-    </details>
-
-    <details class="s-panel" open>
-      <summary class="s-panel-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
-        White Balance
-      </summary>
-      <div class="s-panel-body">
-        <div class="s-ctrl s-ctrl-wide"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
-        <div class="s-ctrl s-ctrl-wide awb-auto"><label>Preset</label><select id="sel-awb" onchange="setCtrl('AwbMode',this.value)"><option value="Auto" selected>Auto</option><option value="Daylight">Daylight</option><option value="Cloudy">Cloudy</option><option value="Tungsten">Tungsten</option><option value="Fluorescent">Fluorescent</option><option value="Indoor">Indoor</option><option value="Incandescent">Incandescent</option></select></div>
-        <div class="s-ctrl awb-manual"><label>Red Gain</label><input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)"><span class="val" id="v-rgain">2.00</span></div>
-        <div class="s-ctrl awb-manual"><label>Blue Gain</label><input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)"><span class="val" id="v-bgain">2.00</span></div>
-      </div>
-    </details>
-
-    <details class="s-panel" open>
-      <summary class="s-panel-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
-        Image
-      </summary>
-      <div class="s-panel-body">
-        <div class="s-ctrl"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val" id="v-brightness">0.00</span></div>
-        <div class="s-ctrl"><label>Contrast</label><input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)"><span class="val" id="v-contrast">1.00</span></div>
-        <div class="s-ctrl"><label>Saturation</label><input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)"><span class="val" id="v-saturation">1.00</span></div>
-        <div class="s-ctrl"><label>Sharpness</label><input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)"><span class="val" id="v-sharpness">1.00</span></div>
-      </div>
-    </details>
-
-    <details class="s-panel">
-      <summary class="s-panel-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        Advanced
-      </summary>
-      <div class="s-panel-body">
-        <div class="s-ctrl s-ctrl-wide"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
-        <div class="s-ctrl s-ctrl-wide"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
-        <div class="s-ctrl s-ctrl-wide"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 × 480</option><option value="1280x720" selected>1280 × 720</option><option value="1920x1080">1920 × 1080</option></select></div>
-        <div class="s-ctrl"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val" id="v-zoom">1.0x</span></div>
-        <div class="s-ctrl s-ctrl-right" style="margin-top:4px"><span></span><button class="btn" onclick="resetDefaults()">Reset All Defaults</button></div>
-      </div>
-    </details>
   </div>
 </section>
 </div><!-- /tab-live -->
