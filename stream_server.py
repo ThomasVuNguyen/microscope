@@ -1366,6 +1366,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbo
 # ═══════════════════════════════════════════════════════════════
 
 class StreamingHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, format, *args):
         if len(args) > 0 and any(skip in str(args[0]) for skip in ["/stream.mjpg", "/api/metrics", "/api/thumb"]):
             return
