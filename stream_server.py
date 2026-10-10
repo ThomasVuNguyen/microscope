@@ -535,515 +535,679 @@ def delete_media_file(filename):
 # ═══════════════════════════════════════════════════════════════
 
 PAGE_HTML = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Microscope</title>
-    <style>
-        /* ── Fonts ── */
-        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
-        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Medium.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
-        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-SemiBold.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
-        @font-face{font-family:'IBM Plex Mono';src:url('/assets/IBMPlexMono-Bold.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Microscope Control Station</title>
+  <style>
+    /* ─── FONTS ─── */
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url(/assets/IBMPlexMono-Regular.woff2) format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url(/assets/IBMPlexMono-Medium.woff2) format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url(/assets/IBMPlexMono-SemiBold.woff2) format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url(/assets/IBMPlexMono-Bold.woff2) format('woff2'); }
 
-        /* ── Reset & Tokens ── */
-        *{box-sizing:border-box;margin:0;padding:0}
-        :root{
-            --bg:#0a0a0a;
-            --layer:#141414;
-            --layer-2:#1e1e1e;
-            --line:rgba(255,255,255,.08);
-            --text:#e5e5e5;
-            --muted:#999;
-            --faint:#777;
-            --accent:#6b8aff;
-            --accent-hover:#8ba3ff;
-            --green:#22c55e;
-            --red:#ef4444;
-            --font:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
-            --shadow-btn:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px -1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
-            --shadow-card:0 0 0 .5px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.12);
-        }
+    /* ─── RESET ─── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { min-width: 320px; margin: 0; }
 
-        /* ── Base ── */
-        body{
-            font-family:var(--font);
-            background:var(--bg);color:var(--text);
-            font-size:13px;font-weight:400;line-height:1.5;
-            -webkit-font-smoothing:antialiased;
-            display:flex;flex-direction:column;align-items:center;
-            min-height:100vh;padding:0;
-        }
+    /* ─── THEME TOKENS ─── */
+    [data-page="microscope"] {
+      color-scheme: dark;
+      --s-bg: #0a0a0a;
+      --s-layer: #141414;
+      --s-layer-2: #1e1e1e;
+      --s-line: rgba(255,255,255,0.08);
+      --s-line-strong: rgba(255,255,255,0.16);
+      --s-text: #e5e5e5;
+      --s-muted: #999999;
+      --s-faint: #777777;
+      --s-accent: #6b8aff;
+      --s-accent-text: #6b8aff;
+      --s-dot: #333333;
+      --s-pattern: #1e1e1e;
+      --s-green: #22c55e;
+      --s-red: #ef4444;
 
-        /* ── Layout Shell ── */
-        .shell{
-            width:100%;max-width:960px;
-            padding:40px 24px 80px;
-        }
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-synthesis: none;
+      overflow-x: clip;
+      background: var(--s-bg);
+      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--s-text);
+      -webkit-font-smoothing: antialiased;
+    }
 
-        /* ── Header ── */
-        header{
-            display:flex;align-items:center;justify-content:space-between;
-            padding:16px 0 24px;
-            border-bottom:1px solid var(--line);
-            margin-bottom:24px;
-        }
-        .logo{
-            display:flex;align-items:center;gap:10px;
-            font-size:13px;font-weight:500;color:var(--text);
-            letter-spacing:0;
-        }
-        .logo svg{color:var(--accent);flex-shrink:0}
-        .logo .dot{
-            width:6px;height:6px;background:var(--accent);
-            display:inline-block;margin-right:2px;
-        }
-        .tabs{display:flex;gap:0}
-        .tab-btn{
-            padding:8px 20px;border:1px solid var(--line);
-            background:var(--layer);color:var(--muted);
-            font-family:var(--font);font-size:11px;font-weight:500;
-            cursor:pointer;border-radius:0;transition:all 120ms ease;
-            letter-spacing:.02em;text-transform:uppercase;
-        }
-        .tab-btn+.tab-btn{border-left:none}
-        .tab-btn.active{
-            background:var(--accent);color:#fff;
-            border-color:var(--accent);
-        }
-        .tab-btn:hover:not(.active){color:var(--text);background:var(--layer-2)}
-        .tab-content{display:none;width:100%;flex-direction:column;gap:8px}
-        .tab-content.active{display:flex}
+    [data-page="microscope"] h1, [data-page="microscope"] h2, [data-page="microscope"] p { margin: 0; }
+    [data-page="microscope"] a { color: var(--s-text); text-decoration: none; }
+    [data-page="microscope"] a:hover { text-decoration: none; }
 
-        /* ── Section Title ── */
-        .section-title{
-            font-size:11px;font-weight:500;color:var(--faint);
-            letter-spacing:.06em;text-transform:uppercase;
-            padding:12px 0 8px;
-        }
+    /* ─── CONTAINER ─── */
+    .s-container { width: 100%; max-width: 80rem; margin: 0 auto; }
 
-        /* ── Stream Viewport ── */
-        .stream-wrap{
-            position:relative;width:100%;
-            background:#000;overflow:hidden;aspect-ratio:16/9;
-            cursor:crosshair;
-            border:1px solid var(--line);
-            border-radius:0;
-        }
-        canvas#view-canvas{width:100%;height:100%;display:block}
+    /* ─── HEADER ─── */
+    .s-header {
+      position: sticky; top: 0; z-index: 10;
+      width: 100%; background: var(--s-bg);
+    }
+    .s-header-bar {
+      display: flex; align-items: center; gap: 16px;
+      min-height: 72px; padding: 20px 20px 20px 24px;
+    }
+    .s-brand {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+      margin-right: auto; color: var(--s-text); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+    }
+    .s-brand svg { flex-shrink: 0; }
+    .s-nav { display: none; align-items: center; justify-content: center; }
+    .s-nav ul { display: flex; align-items: center; margin: 0; padding: 0; list-style: none; }
+    .s-nav a {
+      display: flex; align-items: center; justify-content: center;
+      height: 32px; padding: 0 15px; color: var(--s-muted);
+      font-size: 13px; line-height: 1; white-space: nowrap; text-decoration: none;
+    }
+    .s-nav a:hover { color: var(--s-text); }
+    .s-nav a.active { color: var(--s-text); }
+    .s-header-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+    .s-header-btn {
+      position: relative; flex-shrink: 0; display: inline-flex;
+      align-items: center; justify-content: center; gap: 6px;
+      height: 32px; padding: 0 12px; border: 0; border-radius: 0;
+      appearance: none; font: inherit; font-size: 13px; line-height: 1.1;
+      cursor: pointer; text-decoration: none; white-space: nowrap;
+    }
+    .s-header-btn strong { font-weight: 500; position: relative; z-index: 1; }
+    .s-header-btn span { position: relative; z-index: 1; }
+    .s-header-btn.neutral {
+      color: var(--s-text); background: var(--s-layer-2);
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 1px 1.5px rgba(0,0,0,.3);
+    }
+    .s-header-btn.neutral span { color: var(--s-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+    .s-header-btn.contrast {
+      color: #fff; background: var(--s-accent);
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.12), 0 1px 1.5px rgba(0,0,0,.3);
+    }
 
-        /* ── HUD Overlay ── */
-        .hud{
-            position:absolute;top:0;left:0;padding:6px 12px;
-            font-size:11px;font-weight:500;
-            pointer-events:none;transition:all .2s ease;
-            background:rgba(10,10,10,.75);color:var(--muted);
-            border-right:1px solid var(--line);
-            border-bottom:1px solid var(--line);
-            border-radius:0;
-            font-variant-numeric:tabular-nums;
-        }
-        .hud.busy{background:rgba(107,138,255,.12);color:var(--accent);border-color:rgba(107,138,255,.25)}
+    /* ─── HERO ─── */
+    .s-hero {
+      display: flex; flex-direction: column; align-items: flex-start;
+      justify-content: flex-end; gap: 16px; min-height: 0;
+      overflow: hidden; padding: 96px 24px 32px;
+    }
+    .s-hero-canvas {
+      position: relative; display: flex; flex-direction: column; gap: 24px;
+      width: 100%; min-width: 0;
+    }
+    .s-hero h1 {
+      order: 1; color: var(--s-text);
+      font-size: 48px; font-weight: 500; line-height: 1; letter-spacing: 0;
+    }
+    .s-hero-meta {
+      display: flex; align-items: center; gap: 4px;
+      width: fit-content; height: 24px; padding: 0 8px 0 4px;
+      background: var(--s-layer-2); color: var(--s-muted);
+      font-size: 13px; font-weight: 500; line-height: 1.1;
+    }
+    .s-hero-meta svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .s-hero-copy {
+      order: 3; color: var(--s-muted);
+      font-size: 16px; font-weight: 400; line-height: 1.5;
+    }
+    .s-dot-pattern {
+      order: 2; flex: 0 0 auto; width: 100%; height: 16px; overflow: hidden;
+      background: var(--s-pattern);
+      mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H2V2H0V0Z' fill='black'/%3E%3C/svg%3E");
+      mask-repeat: repeat; mask-size: 6px 6px;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H2V2H0V0Z' fill='black'/%3E%3C/svg%3E");
+      -webkit-mask-repeat: repeat; -webkit-mask-size: 6px 6px;
+    }
 
-        /* ── Recording Badge ── */
-        .rec-dot{
-            position:absolute;top:0;right:0;display:none;align-items:center;gap:6px;
-            background:rgba(239,68,68,.08);color:var(--red);padding:6px 12px;
-            font-size:10px;font-weight:600;
-            letter-spacing:.06em;text-transform:uppercase;
-            border-left:1px solid rgba(239,68,68,.2);
-            border-bottom:1px solid rgba(239,68,68,.2);
-            border-radius:0;
-        }
-        .rec-dot::before{content:'';width:6px;height:6px;background:var(--red);border-radius:50%;animation:blink 1s infinite}
-        @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+    /* ─── SECTIONS ─── */
+    .s-section {
+      position: relative;
+      box-shadow: inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line);
+      padding: 80px 40px; color: var(--s-text);
+    }
+    .s-section:first-of-type {
+      box-shadow: 0 -1px var(--s-line), inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line);
+    }
+    .s-section-title {
+      max-width: 1200px; margin-bottom: 40px; color: var(--s-muted);
+      font-size: 28px; font-weight: 400; line-height: 1.5; letter-spacing: 0;
+    }
+    .s-section-title strong { color: var(--s-text); font-weight: 500; }
+    .s-section-title span { color: var(--s-muted); font-weight: 400; }
 
-        /* ── Reticle ── */
-        .reticle{
-            position:absolute;width:48px;height:48px;
-            border:1px solid rgba(107,138,255,.4);border-radius:0;
-            transform:translate(-50%,-50%);pointer-events:none;
-            transition:all .15s ease;opacity:.7;
-        }
-        .reticle::before,.reticle::after{content:'';position:absolute;background:rgba(107,138,255,.4)}
-        .reticle::before{width:1px;height:12px;left:50%;top:50%;transform:translate(-50%,-50%)}
-        .reticle::after{width:12px;height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
-        .reticle.focusing{border-color:var(--accent);box-shadow:0 0 20px rgba(107,138,255,.2);animation:pulse .8s infinite alternate;opacity:1}
-        .reticle.focusing::before,.reticle.focusing::after{background:var(--accent)}
-        .reticle.focused{border-color:var(--green);opacity:1}
-        .reticle.focused::before,.reticle.focused::after{background:var(--green)}
-        @keyframes pulse{0%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1.06)}}
+    /* ─── TAB NAV ─── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .tab-btn {
+      display: flex; align-items: center; justify-content: center;
+      height: 32px; padding: 0 15px; color: var(--s-muted);
+      font-size: 13px; line-height: 1; white-space: nowrap;
+      font-family: inherit; background: transparent; border: 0;
+      cursor: pointer; text-decoration: none;
+    }
+    .tab-btn:hover { color: var(--s-text); }
+    .tab-btn.active { color: var(--s-text); }
 
-        /* ── Meter Row ── */
-        .meter{
-            width:100%;
-            min-height:48px;padding:10px 12px;
-            border:1px solid var(--line);
-            background:var(--layer);
-            border-radius:0;
-            display:flex;align-items:center;gap:12px;
-        }
-        .meter-label{font-size:11px;color:var(--faint);white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
-        .meter-track{flex:1;height:2px;background:rgba(255,255,255,.06);overflow:hidden}
-        .meter-fill{height:100%;width:0;background:var(--accent);transition:width .2s ease}
-        .meter .mono{font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums}
-        .meter-peak{font-size:11px;color:var(--faint)}
-        .meter-reset{
-            background:var(--layer-2);border:1px solid var(--line);color:var(--muted);
-            padding:4px 10px;border-radius:0;font-size:11px;
-            cursor:pointer;font-family:var(--font);transition:all 120ms ease;
-        }
-        .meter-reset:hover{border-color:rgba(255,255,255,.16);color:var(--text);transform:translateY(-1px)}
+    /* ─── STREAM VIEWPORT ─── */
+    .s-viewport {
+      position: relative; width: 100%;
+      background: #000; overflow: hidden; aspect-ratio: 16/9;
+      cursor: crosshair;
+      border: 1px solid var(--s-line);
+    }
+    canvas#view-canvas { width: 100%; height: 100%; display: block; }
 
-        /* ── Focus Bar ── */
-        .focus-bar{
-            width:100%;
-            min-height:48px;padding:10px 12px;
-            border:1px solid var(--line);
-            background:var(--layer);
-            border-radius:0;
-            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-        }
-        .focus-bar input[type=range]{flex:1;min-width:100px}
+    /* ─── HUD ─── */
+    .hud {
+      position: absolute; top: 0; left: 0;
+      padding: 6px 12px; font-size: 11px; font-weight: 500;
+      pointer-events: none; transition: all .14s ease;
+      background: rgba(10,10,10,.8); color: var(--s-muted);
+      border-right: 1px solid var(--s-line);
+      border-bottom: 1px solid var(--s-line);
+      font-variant-numeric: tabular-nums;
+    }
+    .hud.busy { background: rgba(107,138,255,.08); color: var(--s-accent); border-color: rgba(107,138,255,.2); }
 
-        /* ── Buttons ── */
-        .actions{width:100%;display:flex;gap:6px;flex-wrap:wrap}
-        .btn{
-            display:inline-flex;align-items:center;gap:6px;
-            padding:8px 14px;
-            border:1px solid var(--line);border-radius:0;
-            background:var(--layer);color:var(--muted);
-            font-family:var(--font);font-size:11px;font-weight:500;
-            cursor:pointer;transition:all 120ms ease;
-            text-decoration:none;white-space:nowrap;
-            letter-spacing:.01em;
-            box-shadow:var(--shadow-btn);
-        }
-        .btn:hover{
-            border-color:rgba(255,255,255,.16);color:var(--text);
-            background:var(--layer-2);
-            transform:translateY(-1px);
-            box-shadow:var(--shadow-card);
-        }
-        .btn:active{transform:translateY(0)}
-        .btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
-        .btn svg{width:14px;height:14px;flex-shrink:0}
-        .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
-        .btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
-        .btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:var(--red)}
-        .btn-danger:hover{background:rgba(239,68,68,.12);transform:translateY(-1px)}
-        .btn-sm{padding:5px 10px;font-size:10px}
-        .btn-nudge{padding:6px 10px;font-weight:500;font-size:11px;border-radius:0}
-        .btn-nudge .mono{font-size:11px;font-variant-numeric:tabular-nums}
-        .actions .spacer{flex:1}
+    /* ─── REC BADGE ─── */
+    .rec-dot {
+      position: absolute; top: 0; right: 0;
+      display: none; align-items: center; gap: 6px;
+      background: rgba(239,68,68,.06); color: var(--s-red);
+      padding: 6px 12px; font-size: 10px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      border-left: 1px solid rgba(239,68,68,.2);
+      border-bottom: 1px solid rgba(239,68,68,.2);
+    }
+    .rec-dot::before { content: ''; width: 6px; height: 6px; background: var(--s-red); border-radius: 50%; animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 
-        /* ── Control Panels ── */
-        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;width:100%}
-        .panel{
-            background:linear-gradient(180deg,rgba(255,255,255,.04),transparent),var(--layer);
-            border:1px solid var(--line);
-            border-radius:0;overflow:hidden;
-        }
-        .panel-head{
-            padding:12px 14px;font-size:11px;font-weight:600;
-            color:var(--text);cursor:pointer;display:flex;align-items:center;
-            gap:8px;user-select:none;list-style:none;
-            letter-spacing:.02em;text-transform:uppercase;
-            min-height:48px;
-        }
-        .panel-head svg{width:14px;height:14px;color:var(--accent);flex-shrink:0}
-        .panel-head::after{
-            content:'';margin-left:auto;width:14px;height:14px;
-            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23777' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M3.5 5.25l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
-            transition:transform .2s ease;
-        }
-        details[open] .panel-head::after{transform:rotate(180deg)}
-        details.panel:not([open]) .panel-head{border-bottom:none}
-        .panel-body{padding:4px 14px 14px}
-        .row{
-            display:flex;align-items:center;gap:8px;
-            min-height:36px;
-            padding:2px 0;
-        }
-        .row+.row{border-top:1px solid rgba(255,255,255,.04)}
-        .row label{min-width:80px;font-size:11px;color:var(--faint);font-weight:400}
-        .row input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);cursor:pointer}
-        .row .val{min-width:48px;text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-        .row select{
-            flex:1;background:var(--bg);color:var(--text);
-            border:1px solid var(--line);padding:6px 8px;
-            border-radius:0;font-family:var(--font);
-            font-size:11px;cursor:pointer;outline:none;
-        }
-        .row select:focus{border-color:var(--accent)}
+    /* ─── RETICLE ─── */
+    .reticle {
+      position: absolute; width: 48px; height: 48px;
+      border: 1px solid rgba(107,138,255,.35);
+      transform: translate(-50%,-50%); pointer-events: none;
+      transition: all .15s ease; opacity: .7;
+    }
+    .reticle::before, .reticle::after { content: ''; position: absolute; background: rgba(107,138,255,.35); }
+    .reticle::before { width: 1px; height: 12px; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+    .reticle::after { width: 12px; height: 1px; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+    .reticle.focusing { border-color: var(--s-accent); box-shadow: 0 0 20px rgba(107,138,255,.15); animation: pulse .8s infinite alternate; opacity: 1; }
+    .reticle.focusing::before, .reticle.focusing::after { background: var(--s-accent); }
+    .reticle.focused { border-color: var(--s-green); opacity: 1; }
+    .reticle.focused::before, .reticle.focused::after { background: var(--s-green); }
+    @keyframes pulse { 0%{transform:translate(-50%,-50%) scale(.96)} 100%{transform:translate(-50%,-50%) scale(1.06)} }
 
-        /* ── Toggle Switch ── */
-        .toggle{position:relative;width:32px;height:18px;flex-shrink:0}
-        .toggle input{opacity:0;width:0;height:0}
-        .toggle span{
-            position:absolute;inset:0;background:rgba(255,255,255,.08);
-            border-radius:999px;cursor:pointer;transition:.2s ease;
-            border:1px solid var(--line);
-        }
-        .toggle span::before{content:'';position:absolute;width:12px;height:12px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s ease}
-        .toggle input:checked+span{background:var(--accent);border-color:var(--accent)}
-        .toggle input:checked+span::before{transform:translateX(14px)}
+    /* ─── DATA TABLE ROWS (OpenCode pattern) ─── */
+    .s-table { display: grid; gap: 4px; width: 100%; margin-top: 36px; }
+    .s-table-head {
+      display: grid; align-items: center; gap: 16px; min-height: 28px;
+      padding: 0 12px; color: var(--s-faint); font-size: 11px; font-weight: 500; line-height: 14px;
+    }
+    .s-row {
+      display: grid; align-items: center; gap: 16px; min-height: 48px;
+      padding: 8px 12px; border: 1px solid var(--s-line);
+      background: var(--s-layer); font-size: 13px; color: var(--s-text);
+    }
+    .s-row:hover { border-color: var(--s-line-strong); background: var(--s-layer-2); }
+    .s-row .s-label { color: var(--s-faint); font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .s-row .s-value { font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
 
-        /* ── Status ── */
-        #status-msg{
-            width:100%;font-size:11px;color:var(--faint);
-            min-height:1.4rem;padding:12px 0;text-align:center;
-            border-top:1px solid var(--line);
-            font-variant-numeric:tabular-nums;
-        }
+    /* Sharpness meter row */
+    .s-meter-row { grid-template-columns: 80px 1fr 48px 80px auto; }
+    .s-meter-track { height: 2px; background: rgba(255,255,255,.06); overflow: hidden; }
+    .s-meter-fill { height: 100%; width: 0; background: var(--s-accent); transition: width .2s ease; }
 
-        /* ── Gallery ── */
-        .gallery-toolbar{
-            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-            width:100%;padding:12px 0;
-            border-bottom:1px solid var(--line);
-            margin-bottom:12px;
-        }
-        .gallery-toolbar select{
-            background:var(--layer);color:var(--text);border:1px solid var(--line);
-            padding:6px 10px;border-radius:0;font-family:var(--font);font-size:11px;
-        }
-        .gallery-toolbar .stats{
-            margin-left:auto;font-size:11px;color:var(--faint);
-            font-variant-numeric:tabular-nums;
-        }
-        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;width:100%}
-        .m-card{
-            background:linear-gradient(180deg,rgba(255,255,255,.04),transparent),var(--layer);
-            border:1px solid var(--line);
-            border-radius:0;overflow:hidden;
-            transition:all 120ms ease;
-        }
-        .m-card:hover{
-            border-color:rgba(255,255,255,.16);
-            box-shadow:var(--shadow-card);
-            transform:translateY(-1px);
-        }
-        .m-thumb{position:relative;width:100%;aspect-ratio:4/3;background:#000;cursor:pointer;overflow:hidden}
-        .m-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
-        .m-card:hover .m-thumb img{transform:scale(1.02)}
-        .m-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
-        .m-thumb .play svg{width:32px;height:32px;color:#fff;opacity:.8}
-        .m-info{padding:10px 12px 4px}
-        .m-name{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
-        .m-meta{font-size:10px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
-        .m-actions{display:flex;gap:4px;padding:6px 12px 10px}
-        .m-actions .btn{padding:4px 8px;font-size:10px}
-        .empty{grid-column:1/-1;text-align:center;color:var(--faint);padding:60px 20px;font-size:13px}
+    /* Focus row */
+    .s-focus-row { grid-template-columns: 50px auto 1fr 48px 30px auto; }
+    .s-focus-row input[type=range] { min-width: 80px; }
 
-        /* ── Lightbox ── */
-        .lb{
-            display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);
-            z-index:1000;flex-direction:column;align-items:center;justify-content:center;
-            padding:20px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-        }
-        .lb.open{display:flex}
-        .lb-close{
-            position:absolute;top:16px;right:20px;width:36px;height:36px;
-            display:flex;align-items:center;justify-content:center;
-            border-radius:0;background:var(--layer);
-            border:1px solid var(--line);color:var(--muted);font-size:18px;
-            cursor:pointer;font-family:var(--font);transition:all 120ms ease;
-        }
-        .lb-close:hover{background:var(--layer-2);color:var(--text);transform:translateY(-1px)}
-        .lb-body{max-width:95vw;max-height:80vh}
-        .lb-body img,.lb-body video{max-width:100%;max-height:80vh;border-radius:0;border:1px solid var(--line)}
-        .lb-bar{display:flex;align-items:center;gap:16px;margin-top:16px;font-size:11px;color:var(--muted)}
-        .lb-bar a{color:var(--accent);text-decoration:none}
-        .lb-bar a:hover{color:var(--accent-hover)}
+    /* ─── LEADER CARDS (for action buttons) ─── */
+    .s-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; margin-top: 16px; }
+    .s-card {
+      position: relative; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
+      min-height: 88px; padding: 16px; border: 1px solid var(--s-line);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent), var(--s-layer);
+      font-size: 11px; font-weight: 500; line-height: 1.1; color: var(--s-muted);
+      cursor: pointer; text-decoration: none;
+      box-shadow: 0 0 0 .5px rgba(0,0,0,.12), 0 1px 2px -1px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+      transition: background .14s ease, border-color .14s ease, box-shadow .14s ease, transform .14s ease;
+    }
+    .s-card:hover {
+      border-color: var(--s-line-strong);
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 6px 16px rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.1);
+      transform: translateY(-1px); color: var(--s-text);
+    }
+    .s-card:active { transform: translateY(0); }
+    .s-card:disabled, .s-card[disabled] { opacity: .3; cursor: not-allowed; transform: none !important; }
+    .s-card svg { width: 20px; height: 20px; color: var(--s-accent); }
+    .s-card.primary { background: linear-gradient(180deg, rgba(107,138,255,.15), rgba(107,138,255,.05)), var(--s-layer); border-color: rgba(107,138,255,.2); }
+    .s-card.primary svg { color: var(--s-accent); }
+    .s-card.primary:hover { border-color: rgba(107,138,255,.4); }
+    .s-card.danger { border-color: rgba(239,68,68,.2); color: var(--s-red); }
+    .s-card.danger svg { color: var(--s-red); }
 
-        /* ── Dot Matrix Decoration ── */
-        .dot-matrix{
-            position:relative;
-        }
-        .dot-matrix::before{
-            content:'';position:absolute;top:0;right:0;width:48px;height:48px;
-            opacity:.15;
-            background-image:radial-gradient(circle,var(--muted) 1px,transparent 1px);
-            background-size:6px 6px;
-            pointer-events:none;
-        }
+    /* ─── BUTTON (small/inline) ─── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 0; height: 24px; padding: 0 8px;
+      border: 0; background: var(--s-layer-2); color: var(--s-faint);
+      font: inherit; font-size: 11px; font-weight: 500; cursor: pointer;
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.06);
+      transition: color .14s ease, background .14s ease;
+    }
+    .btn:hover { color: var(--s-text); background: rgba(255,255,255,.08); }
+    .btn:disabled { opacity: .3; cursor: not-allowed; }
+    .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .btn-danger { background: rgba(239,68,68,.06); color: var(--s-red); box-shadow: 0 0 0 .5px rgba(239,68,68,.15); }
+    .btn-danger:hover { background: rgba(239,68,68,.12); }
 
-        /* ── Range Input Styling ── */
-        input[type=range]{
-            -webkit-appearance:none;appearance:none;
-            height:2px;background:var(--line);outline:none;
-            border-radius:0;
-        }
-        input[type=range]::-webkit-slider-thumb{
-            -webkit-appearance:none;appearance:none;
-            width:12px;height:12px;background:var(--accent);
-            border-radius:0;cursor:pointer;border:none;
-        }
-        input[type=range]::-moz-range-thumb{
-            width:12px;height:12px;background:var(--accent);
-            border-radius:0;cursor:pointer;border:none;
-        }
+    /* ─── NUDGE BUTTONS ─── */
+    .s-nudge {
+      display: inline-flex; align-items: center; justify-content: center;
+      height: 32px; min-width: 48px; padding: 0 8px;
+      border: 1px solid var(--s-line); background: var(--s-layer);
+      color: var(--s-muted); font: inherit; font-size: 11px; font-weight: 500;
+      font-variant-numeric: tabular-nums; cursor: pointer;
+      transition: all .14s ease;
+    }
+    .s-nudge:hover { border-color: var(--s-line-strong); color: var(--s-text); background: var(--s-layer-2); transform: translateY(-1px); }
 
-        /* ── Responsive ── */
-        @media(max-width:480px){
-            .shell{padding:20px 12px 40px}
-            header{flex-direction:column;gap:12px;align-items:flex-start}
-            .focus-bar{gap:4px}
-            .btn-nudge{padding:4px 6px;font-size:10px}
-        }
+    /* ─── CONTROL PANELS ─── */
+    .s-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; margin-top: 36px; }
+    .s-panel {
+      border: 1px solid var(--s-line);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent), var(--s-layer);
+      overflow: hidden;
+    }
+    .s-panel-head {
+      padding: 12px 16px; font-size: 11px; font-weight: 600;
+      color: var(--s-text); cursor: pointer; display: flex; align-items: center;
+      gap: 8px; user-select: none; list-style: none;
+      letter-spacing: .02em; text-transform: uppercase; min-height: 48px;
+    }
+    .s-panel-head svg { width: 14px; height: 14px; color: var(--s-accent); flex-shrink: 0; }
+    .s-panel-head::after {
+      content: ''; margin-left: auto; width: 14px; height: 14px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23777' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M3.5 5.25l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+      transition: transform .2s ease;
+    }
+    details[open] .s-panel-head::after { transform: rotate(180deg); }
+    details.s-panel:not([open]) .s-panel-head { border-bottom: none; }
+    .s-panel-body { padding: 4px 16px 16px; }
+    .s-ctrl {
+      display: grid; grid-template-columns: 80px 1fr 48px;
+      align-items: center; gap: 12px; min-height: 40px; padding: 2px 0;
+    }
+    .s-ctrl + .s-ctrl { border-top: 1px solid rgba(255,255,255,.04); }
+    .s-ctrl label { font-size: 11px; color: var(--s-faint); font-weight: 400; }
+    .s-ctrl input[type=range] { width: 100%; accent-color: var(--s-accent); cursor: pointer; }
+    .s-ctrl .val { text-align: right; font-size: 11px; color: var(--s-muted); font-variant-numeric: tabular-nums; }
+    .s-ctrl select {
+      width: 100%; background: var(--s-bg); color: var(--s-text);
+      border: 1px solid var(--s-line); padding: 6px 8px;
+      font: inherit; font-size: 11px; cursor: pointer; outline: none;
+    }
+    .s-ctrl select:focus { border-color: var(--s-accent); }
+    .s-ctrl-wide { grid-template-columns: 80px 1fr; }
+    .s-ctrl-right { grid-template-columns: 1fr auto; }
 
-    </style>
+    /* ─── TOGGLE ─── */
+    .toggle { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle span {
+      position: absolute; inset: 0; background: rgba(255,255,255,.08);
+      border-radius: 999px; cursor: pointer; transition: .2s ease;
+      border: 1px solid var(--s-line);
+    }
+    .toggle span::before { content: ''; position: absolute; width: 12px; height: 12px; left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: .2s ease; }
+    .toggle input:checked+span { background: var(--s-accent); border-color: var(--s-accent); }
+    .toggle input:checked+span::before { transform: translateX(14px); }
+
+    /* ─── STATUS (like footer status) ─── */
+    #status-msg {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; font-size: 11px; color: var(--s-muted);
+      min-height: 28px; padding: 16px 12px; margin-top: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─── GALLERY ─── */
+    .s-gallery-bar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .s-gallery-bar select {
+      background: var(--s-layer); color: var(--s-text);
+      border: 1px solid var(--s-line); padding: 6px 10px;
+      font: inherit; font-size: 11px;
+    }
+    .s-gallery-bar .stats {
+      margin-left: auto; font-size: 11px; color: var(--s-faint);
+      font-variant-numeric: tabular-nums;
+    }
+    .gallery-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px; width: 100%;
+    }
+    .m-card {
+      border: 1px solid var(--s-line);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent), var(--s-layer);
+      overflow: hidden;
+      transition: all .14s ease;
+    }
+    .m-card:hover {
+      border-color: var(--s-line-strong);
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 6px 16px rgba(0,0,0,.15);
+      transform: translateY(-1px);
+    }
+    .m-thumb { position: relative; width: 100%; aspect-ratio: 4/3; background: #000; cursor: pointer; overflow: hidden; }
+    .m-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
+    .m-card:hover .m-thumb img { transform: scale(1.02); }
+    .m-thumb .play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.4); }
+    .m-thumb .play svg { width: 32px; height: 32px; color: #fff; opacity: .8; }
+    .m-info { padding: 10px 12px 4px; }
+    .m-name { font-size: 11px; color: var(--s-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+    .m-meta { font-size: 10px; color: var(--s-faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .m-actions { display: flex; gap: 4px; padding: 6px 12px 10px; }
+    .empty { grid-column: 1/-1; text-align: center; color: var(--s-faint); padding: 60px 20px; font-size: 13px; }
+
+    /* ─── LIGHTBOX ─── */
+    .lb {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.92);
+      z-index: 1000; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    }
+    .lb.open { display: flex; }
+    .lb-close {
+      position: absolute; top: 16px; right: 20px; width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--s-layer-2); border: 0; color: var(--s-faint);
+      font-size: 18px; cursor: pointer; font-family: inherit;
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.08);
+      transition: color .14s ease;
+    }
+    .lb-close:hover { color: var(--s-text); }
+    .lb-body { max-width: 95vw; max-height: 80vh; }
+    .lb-body img, .lb-body video { max-width: 100%; max-height: 80vh; border: 1px solid var(--s-line); }
+    .lb-bar { display: flex; align-items: center; gap: 16px; margin-top: 16px; font-size: 11px; color: var(--s-muted); }
+    .lb-bar a { color: var(--s-accent-text); text-decoration: none; }
+    .lb-bar a:hover { color: var(--s-text); }
+
+    /* ─── RANGE INPUT ─── */
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      height: 2px; background: var(--s-line); outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 10px; height: 10px; background: var(--s-accent); border: none; cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 10px; height: 10px; background: var(--s-accent); border: none; cursor: pointer;
+    }
+
+    /* ─── FOOTER ─── */
+    .s-footer {
+      position: relative; display: grid; gap: 24px;
+      padding: 48px clamp(16px, 4vw, 40px) 24px;
+      font-size: 11px;
+    }
+    .s-footer-pattern {
+      height: 16px; overflow: hidden; background: var(--s-pattern);
+      mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H2V2H0V0Z' fill='black'/%3E%3C/svg%3E");
+      mask-repeat: repeat; mask-size: 6px 6px;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H2V2H0V0Z' fill='black'/%3E%3C/svg%3E");
+      -webkit-mask-repeat: repeat; -webkit-mask-size: 6px 6px;
+    }
+    .s-footer-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; font-size: 11px; line-height: 1;
+    }
+    .s-status { display: flex; align-items: center; gap: 10px; color: var(--s-muted); }
+    .s-status::before { content: ''; width: 6px; height: 6px; background: #198b43; }
+
+    /* ─── DESKTOP ─── */
+    @media (min-width: 48rem) {
+      .s-hero { padding: 96px 32px 24px; }
+      .s-hero-canvas { position: relative; display: block; height: 180px; overflow: hidden; }
+      .s-hero h1 { position: absolute; top: 0; left: 0; z-index: 1; padding: 0 12px 12px 0; background: var(--s-bg); }
+      .s-hero-copy { position: absolute; right: 0; bottom: 0; z-index: 1; padding: 12px 0 0 16px; background: var(--s-bg); text-align: right; }
+      .s-nav { display: flex; }
+    }
+
+    /* ─── MOBILE ─── */
+    @media (max-width: 47.99rem) {
+      .s-section { padding: 48px 16px; }
+      .s-section-title { font-size: 20px; }
+      .s-hero h1 { font-size: 32px; }
+      .s-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr)); }
+      .s-cards .s-card { min-height: 72px; padding: 12px; }
+      .s-meter-row { grid-template-columns: 60px 1fr 40px 70px auto; }
+      .s-focus-row { grid-template-columns: 40px auto 1fr 40px 25px auto; }
+      .s-ctrl { grid-template-columns: 70px 1fr 40px; gap: 8px; }
+    }
+  </style>
 </head>
 <body>
-<div class="shell">
+<main data-page="microscope">
 
-<header>
-    <div class="logo">
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-        microscope
+<!-- ─── HEADER ─── -->
+<header class="s-header">
+  <div class="s-header-bar">
+    <a class="s-brand" href="#">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path opacity="0.2" d="M12 12H4V6H12V12Z" fill="currentColor"/><path d="M12 3H4V12H12V3ZM14 1H2V14H14V1Z" fill="currentColor"/></svg>
+      microscope
+    </a>
+    <nav class="s-nav" aria-label="Sections">
+      <ul>
+        <li><button class="tab-btn active" onclick="switchTab('live',this)">Live View</button></li>
+        <li><button class="tab-btn" onclick="switchTab('gallery',this)">Gallery</button></li>
+      </ul>
+    </nav>
+    <div class="s-header-actions">
+      <a class="s-header-btn neutral" href="/api/controls" target="_blank"><strong>API</strong><span>[json]</span></a>
+      <a class="s-header-btn contrast" href="/api/camera_info" target="_blank"><strong>Camera Info</strong></a>
     </div>
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('live',this)">live</button>
-        <button class="tab-btn" onclick="switchTab('gallery',this)">gallery</button>
-    </div>
+  </div>
 </header>
+
+<div class="s-container">
+
+<!-- ─── HERO ─── -->
+<section class="s-hero">
+  <p class="s-hero-meta">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 13H3V3H13V13ZM6.46777 6.81641V7.81641H7.5791V11.3721H8.5791V6.81641H6.46777ZM7.30078 4.62891V5.62891H8.85645V4.62891H7.30078Z" fill="currentColor"/></svg>
+    IMX519 16MP &middot; Raspberry Pi 5
+  </p>
+  <div class="s-hero-canvas">
+    <div class="s-dot-pattern" aria-hidden="true"></div>
+    <h1>Control Station</h1>
+    <p class="s-hero-copy">Live camera feed, precision focus control, 16MP capture,<br>and full exposure management.</p>
+  </div>
+</section>
 
 <!-- ═══ LIVE TAB ═══ -->
 <div id="tab-live" class="tab-content active">
-    <div class="stream-wrap" id="container">
-        <canvas id="view-canvas"></canvas>
-        <div class="hud" id="hud">connecting...</div>
-        <div class="rec-dot" id="rec-badge">rec</div>
-        <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
+
+<!-- ─── LIVE FEED ─── -->
+<section class="s-section" style="box-shadow: 0 -1px var(--s-line), inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line);">
+  <h2 class="s-section-title"><strong>Live Feed.</strong> <span>MJPEG stream from IMX519 sensor.</span></h2>
+
+  <div class="s-viewport" id="container">
+    <canvas id="view-canvas"></canvas>
+    <div class="hud" id="hud">Connecting...</div>
+    <div class="rec-dot" id="rec-badge">REC</div>
+    <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
+  </div>
+
+  <!-- Sharpness meter as data-table row -->
+  <div class="s-table">
+    <div class="s-row s-meter-row">
+      <span class="s-label">SHARPNESS</span>
+      <div class="s-meter-track"><div id="meter-fill" class="s-meter-fill"></div></div>
+      <span class="s-value" id="sharp-val" style="color:var(--s-accent)">0.0</span>
+      <span style="color:var(--s-faint);font-size:11px">peak <span id="peak-val" style="font-variant-numeric:tabular-nums">0.0</span></span>
+      <button class="btn" onclick="fetch('/api/reset_peak')">Reset</button>
     </div>
+  </div>
 
-    <div class="meter dot-matrix">
-        <span class="meter-label">sharpness</span>
-        <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
-        <span class="mono" id="sharp-val">0.0</span>
-        <span class="meter-peak">peak <span class="mono" id="peak-val">0.0</span></span>
-        <button class="meter-reset" onclick="fetch('/api/reset_peak')">reset</button>
+  <!-- Focus as data-table row -->
+  <div class="s-table" style="margin-top:4px">
+    <div class="s-row s-focus-row">
+      <span class="s-label">FOCUS</span>
+      <div style="display:flex;gap:4px">
+        <button class="s-nudge" onclick="nudgeFocus(-0.20)">−.20</button>
+        <button class="s-nudge" onclick="nudgeFocus(-0.05)">−.05</button>
+      </div>
+      <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
+      <span class="s-value" id="focus-label" style="color:var(--s-text)">1.60</span>
+      <span class="s-label">dpt</span>
+      <div style="display:flex;gap:4px">
+        <button class="s-nudge" onclick="nudgeFocus(0.05)">+.05</button>
+        <button class="s-nudge" onclick="nudgeFocus(0.20)">+.20</button>
+      </div>
     </div>
+  </div>
 
-    <div class="focus-bar">
-        <span style="font-size:10px;font-weight:500;color:var(--faint);letter-spacing:.04em;text-transform:uppercase">focus</span>
-        <button class="btn btn-nudge" onclick="nudgeFocus(-0.20)"><span class="mono">−.20</span></button>
-        <button class="btn btn-nudge" onclick="nudgeFocus(-0.05)"><span class="mono">−.05</span></button>
-        <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
-        <span class="mono val" id="focus-label" style="min-width:42px;text-align:center;color:var(--text)">1.60</span>
-        <span style="font-size:10px;font-weight:500;color:var(--faint);letter-spacing:.04em;text-transform:uppercase">dpt</span>
-        <button class="btn btn-nudge" onclick="nudgeFocus(0.05)"><span class="mono">+.05</span></button>
-        <button class="btn btn-nudge" onclick="nudgeFocus(0.20)"><span class="mono">+.20</span></button>
-    </div>
+  <!-- Actions as leader cards -->
+  <div class="s-cards">
+    <button class="s-card" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+      Autofocus
+    </button>
+    <button class="s-card" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+      Broad Scan
+    </button>
+    <button class="s-card primary" id="btn-snap" onclick="capture16MP()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Capture 16MP
+    </button>
+    <button class="s-card" id="btn-rec" onclick="toggleRecording()">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>
+      Record
+    </button>
+    <a class="s-card" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </a>
+  </div>
 
-    <div class="actions">
-        <button class="btn" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>autofocus
-        </button>
-        <button class="btn" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>broad scan
-        </button>
-        <div class="spacer"></div>
-        <button class="btn btn-primary" id="btn-snap" onclick="capture16MP()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>capture 16mp
-        </button>
-        <button class="btn" id="btn-rec" onclick="toggleRecording()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>record
-        </button>
-        <a class="btn" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>download
-        </a>
-    </div>
+  <div id="status-msg"></div>
+</section>
 
-    <!-- ── Control Panels ── -->
-    <div class="section-title">controls</div>
-    <div class="grid">
-        <details class="panel" open>
-            <summary class="panel-head">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-                exposure
-            </summary>
-            <div class="panel-body">
-                <div class="row"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
-                <div class="row ae-manual"><label>Exposure µs</label><input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)"><span class="val mono" id="v-exposure">20000</span></div>
-                <div class="row ae-manual"><label>Gain</label><input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)"><span class="val mono" id="v-gain">1.0</span></div>
-                <div class="row ae-auto"><label>EV Comp</label><input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)"><span class="val mono" id="v-ev">0.0</span></div>
-                <div class="row ae-auto"><label>Metering</label><select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)"><option value="CentreWeighted" selected>Centre-Weighted</option><option value="Spot">Spot</option><option value="Matrix">Matrix</option></select></div>
-                <div class="row ae-auto"><label>Mode</label><select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)"><option value="Normal" selected>Normal</option><option value="Short">Short</option><option value="Long">Long</option></select></div>
-            </div>
-        </details>
+<!-- ─── CONTROLS ─── -->
+<section class="s-section">
+  <h2 class="s-section-title"><strong>Controls.</strong> <span>Camera exposure, white balance, and image settings.</span></h2>
 
-        <details class="panel" open>
-            <summary class="panel-head">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
-                white balance
-            </summary>
-            <div class="panel-body">
-                <div class="row"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
-                <div class="row awb-auto"><label>Preset</label><select id="sel-awb" onchange="setCtrl('AwbMode',this.value)"><option value="Auto" selected>Auto</option><option value="Daylight">Daylight</option><option value="Cloudy">Cloudy</option><option value="Tungsten">Tungsten</option><option value="Fluorescent">Fluorescent</option><option value="Indoor">Indoor</option><option value="Incandescent">Incandescent</option></select></div>
-                <div class="row awb-manual"><label>Red Gain</label><input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)"><span class="val mono" id="v-rgain">2.00</span></div>
-                <div class="row awb-manual"><label>Blue Gain</label><input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)"><span class="val mono" id="v-bgain">2.00</span></div>
-            </div>
-        </details>
+  <div class="s-panels">
+    <details class="s-panel" open>
+      <summary class="s-panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+        Exposure
+      </summary>
+      <div class="s-panel-body">
+        <div class="s-ctrl s-ctrl-wide"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
+        <div class="s-ctrl ae-manual"><label>Exposure µs</label><input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)"><span class="val" id="v-exposure">20000</span></div>
+        <div class="s-ctrl ae-manual"><label>Gain</label><input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)"><span class="val" id="v-gain">1.0</span></div>
+        <div class="s-ctrl ae-auto"><label>EV Comp</label><input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)"><span class="val" id="v-ev">0.0</span></div>
+        <div class="s-ctrl s-ctrl-wide ae-auto"><label>Metering</label><select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)"><option value="CentreWeighted" selected>Centre-Weighted</option><option value="Spot">Spot</option><option value="Matrix">Matrix</option></select></div>
+        <div class="s-ctrl s-ctrl-wide ae-auto"><label>Mode</label><select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)"><option value="Normal" selected>Normal</option><option value="Short">Short</option><option value="Long">Long</option></select></div>
+      </div>
+    </details>
 
-        <details class="panel" open>
-            <summary class="panel-head">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
-                image
-            </summary>
-            <div class="panel-body">
-                <div class="row"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val mono" id="v-brightness">0.00</span></div>
-                <div class="row"><label>Contrast</label><input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)"><span class="val mono" id="v-contrast">1.00</span></div>
-                <div class="row"><label>Saturation</label><input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)"><span class="val mono" id="v-saturation">1.00</span></div>
-                <div class="row"><label>Sharpness</label><input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)"><span class="val mono" id="v-sharpness">1.00</span></div>
-            </div>
-        </details>
+    <details class="s-panel" open>
+      <summary class="s-panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        White Balance
+      </summary>
+      <div class="s-panel-body">
+        <div class="s-ctrl s-ctrl-wide"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
+        <div class="s-ctrl s-ctrl-wide awb-auto"><label>Preset</label><select id="sel-awb" onchange="setCtrl('AwbMode',this.value)"><option value="Auto" selected>Auto</option><option value="Daylight">Daylight</option><option value="Cloudy">Cloudy</option><option value="Tungsten">Tungsten</option><option value="Fluorescent">Fluorescent</option><option value="Indoor">Indoor</option><option value="Incandescent">Incandescent</option></select></div>
+        <div class="s-ctrl awb-manual"><label>Red Gain</label><input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)"><span class="val" id="v-rgain">2.00</span></div>
+        <div class="s-ctrl awb-manual"><label>Blue Gain</label><input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)"><span class="val" id="v-bgain">2.00</span></div>
+      </div>
+    </details>
 
-        <details class="panel">
-            <summary class="panel-head">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                advanced
-            </summary>
-            <div class="panel-body">
-                <div class="row"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
-                <div class="row"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
-                <div class="row"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 × 480</option><option value="1280x720" selected>1280 × 720</option><option value="1920x1080">1920 × 1080</option></select></div>
-                <div class="row"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val mono" id="v-zoom">1.0x</span></div>
-                <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn btn-sm" onclick="resetDefaults()">reset all defaults</button></div>
-            </div>
-        </details>
-    </div>
+    <details class="s-panel" open>
+      <summary class="s-panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
+        Image
+      </summary>
+      <div class="s-panel-body">
+        <div class="s-ctrl"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val" id="v-brightness">0.00</span></div>
+        <div class="s-ctrl"><label>Contrast</label><input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)"><span class="val" id="v-contrast">1.00</span></div>
+        <div class="s-ctrl"><label>Saturation</label><input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)"><span class="val" id="v-saturation">1.00</span></div>
+        <div class="s-ctrl"><label>Sharpness</label><input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)"><span class="val" id="v-sharpness">1.00</span></div>
+      </div>
+    </details>
 
-    <div id="status-msg"></div>
-</div>
+    <details class="s-panel">
+      <summary class="s-panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Advanced
+      </summary>
+      <div class="s-panel-body">
+        <div class="s-ctrl s-ctrl-wide"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
+        <div class="s-ctrl s-ctrl-wide"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
+        <div class="s-ctrl s-ctrl-wide"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 × 480</option><option value="1280x720" selected>1280 × 720</option><option value="1920x1080">1920 × 1080</option></select></div>
+        <div class="s-ctrl"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val" id="v-zoom">1.0x</span></div>
+        <div class="s-ctrl s-ctrl-right" style="margin-top:4px"><span></span><button class="btn" onclick="resetDefaults()">Reset All Defaults</button></div>
+      </div>
+    </details>
+  </div>
+</section>
+</div><!-- /tab-live -->
 
 <!-- ═══ GALLERY TAB ═══ -->
 <div id="tab-gallery" class="tab-content">
-    <div class="gallery-toolbar">
-        <select id="gallery-sort" onchange="loadGallery()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest First</option><option value="name">By Name</option></select>
-        <select id="gallery-type" onchange="loadGallery()"><option value="all">All Files</option><option value="image">Images Only</option><option value="video">Videos Only</option></select>
-        <button class="btn btn-sm" onclick="loadGallery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>refresh</button>
-        <span class="stats" id="gallery-stats"></span>
-    </div>
-    <div class="gallery-grid" id="gallery-grid"></div>
+<section class="s-section" style="box-shadow: 0 -1px var(--s-line), inset 0 -1px var(--s-line), inset 1px 0 var(--s-line), inset -1px 0 var(--s-line);">
+  <h2 class="s-section-title"><strong>Gallery.</strong> <span>Captured images and recorded video.</span></h2>
+
+  <div class="s-gallery-bar">
+    <select id="gallery-sort" onchange="loadGallery()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest First</option><option value="name">By Name</option></select>
+    <select id="gallery-type" onchange="loadGallery()"><option value="all">All Files</option><option value="image">Images Only</option><option value="video">Videos Only</option></select>
+    <button class="btn" onclick="loadGallery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Refresh</button>
+    <span class="stats" id="gallery-stats"></span>
+  </div>
+  <div class="gallery-grid" id="gallery-grid"></div>
+</section>
 </div>
 
 <!-- ═══ Lightbox ═══ -->
 <div class="lb" id="lightbox">
-    <button class="lb-close" onclick="closeLightbox()">&times;</button>
-    <div class="lb-body" id="lightbox-content"></div>
-    <div class="lb-bar">
-        <span id="lb-name"></span>
-        <span id="lb-size" style="color:var(--faint)"></span>
-        <a id="lb-download" href="#" download>download</a>
-        <button class="btn btn-danger btn-sm" id="lb-delete" onclick="deleteLightboxFile()">delete</button>
-    </div>
+  <button class="lb-close" onclick="closeLightbox()">&times;</button>
+  <div class="lb-body" id="lightbox-content"></div>
+  <div class="lb-bar">
+    <span id="lb-name"></span>
+    <span id="lb-size" style="color:var(--s-faint)"></span>
+    <a id="lb-download" href="#" download>Download</a>
+    <button class="btn btn-danger" id="lb-delete" onclick="deleteLightboxFile()">Delete</button>
+  </div>
 </div>
 
-</div><!-- /.shell -->
+</div><!-- /s-container -->
+
+<!-- ─── FOOTER ─── -->
+<footer class="s-footer">
+  <div class="s-footer-pattern"></div>
+  <div class="s-footer-bottom">
+    <div>
+      <span class="s-status">Camera streaming</span>
+    </div>
+    <div style="color:var(--s-faint)">Microscope Control Station &middot; Port 1306</div>
+  </div>
+</footer>
+
+</main>
 
 <script>
 const canvas=document.getElementById('view-canvas'),ctx=canvas.getContext('2d'),hud=document.getElementById('hud'),container=document.getElementById('container'),reticle=document.getElementById('reticle'),statusMsg=document.getElementById('status-msg'),recBadge=document.getElementById('rec-badge');
@@ -1066,11 +1230,11 @@ updateAeUI();updateAwbUI();
 container.addEventListener('click',e=>{if(isBusy)return;const r=container.getBoundingClientRect();targetX=Math.max(.05,Math.min(.95,(e.clientX-r.left)/r.width));targetY=Math.max(.05,Math.min(.95,(e.clientY-r.top)/r.height));reticle.style.left=(targetX*100)+'%';reticle.style.top=(targetY*100)+'%';triggerSpotFocus(targetX,targetY)});
 
 function triggerSpotFocus(x,y,broad=false){if(isBusy)return;isBusy=true;reticle.className='reticle focusing';hud.className='hud busy';hud.innerText='Focusing ['+Math.round(x*100)+'%, '+Math.round(y*100)+'%]...';statusMsg.innerText='Running '+(broad?'broad':'precision')+' focus sweep...';setControlsDisabled(true);fetch('/api/focus_spot?x='+x.toFixed(3)+'&y='+y.toFixed(3)+(broad?'&broad=1':'')).then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);reticle.className='reticle focused';hud.className='hud';hud.innerText='Focused: '+d.best_focus.toFixed(2)+' dpt | Score: '+d.score;document.getElementById('focus-label').innerText=d.best_focus.toFixed(2);document.getElementById('focus-slider').value=Math.round(d.best_focus*100);statusMsg.innerText='Focus locked at '+d.best_focus.toFixed(2)+' dpt (Score: '+d.score+') in '+d.duration+'s';setTimeout(()=>{reticle.className='reticle'},1500)}).catch(err=>{isBusy=false;setControlsDisabled(false);reticle.className='reticle';hud.className='hud';statusMsg.innerText='Focus failed: '+err})}
-function setControlsDisabled(d){document.querySelectorAll('.actions .btn').forEach(b=>b.disabled=d)}
+function setControlsDisabled(d){document.querySelectorAll('.s-card').forEach(b=>b.disabled=d)}
 
-function capture16MP(){if(isBusy)return;isBusy=true;statusMsg.innerText='Capturing 16MP still...';hud.innerText='Capturing...';setControlsDisabled(true);fetch('/api/capture_16mp').then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);hud.innerText=d.size_mb+' MB captured';statusMsg.innerText='Saved: '+d.name+' ('+d.size_mb+' MB) in '+d.duration+'s';document.getElementById('btn-dl').style.display='inline-flex';document.getElementById('btn-dl').href='/download_latest?t='+Date.now()}).catch(err=>{isBusy=false;setControlsDisabled(false);statusMsg.innerText='Capture error: '+err})}
+function capture16MP(){if(isBusy)return;isBusy=true;statusMsg.innerText='Capturing 16MP still...';hud.innerText='Capturing...';setControlsDisabled(true);fetch('/api/capture_16mp').then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);hud.innerText=d.size_mb+' MB captured';statusMsg.innerText='Saved: '+d.name+' ('+d.size_mb+' MB) in '+d.duration+'s';document.getElementById('btn-dl').style.display='flex';document.getElementById('btn-dl').href='/download_latest?t='+Date.now()}).catch(err=>{isBusy=false;setControlsDisabled(false);statusMsg.innerText='Capture error: '+err})}
 
-function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>record';b.classList.remove('btn-danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>stop';b.classList.add('btn-danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
+function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record';b.classList.remove('danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop';b.classList.add('danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
 
 function changeResolution(v){const[w,h]=v.split('x').map(Number);statusMsg.innerText='Switching to '+w+'\u00d7'+h+'...';fetch('/api/resolution?width='+w+'&height='+h).then(r=>r.json()).then(d=>{statusMsg.innerText='Resolution: '+d.resolution[0]+'\u00d7'+d.resolution[1]}).catch(err=>{statusMsg.innerText='Error: '+err})}
 function resetDefaults(){fetch('/api/reset_defaults').then(r=>r.json()).then(()=>{statusMsg.innerText='All controls reset';setTimeout(syncControlsFromServer,200)})}
@@ -1086,7 +1250,7 @@ document.querySelectorAll('input[type=range]').forEach(sl=>{sl.addEventListener(
 document.addEventListener('mouseup',()=>{setTimeout(()=>{pollingPaused=false},300)});document.addEventListener('touchend',()=>{setTimeout(()=>{pollingPaused=false},300)});
 syncControlsFromServer();
 
-function loadGallery(){fetch('/api/media').then(r=>r.json()).then(files=>{const sort=document.getElementById('gallery-sort').value;const tf=document.getElementById('gallery-type').value;if(tf!=='all')files=files.filter(f=>f.type===tf);if(sort==='oldest')files.sort((a,b)=>a.mtime-b.mtime);else if(sort==='largest')files.sort((a,b)=>b.size-a.size);else if(sort==='name')files.sort((a,b)=>a.name.localeCompare(b.name));const totalMB=files.reduce((s,f)=>s+f.size_mb,0).toFixed(1);document.getElementById('gallery-stats').innerText=files.length+' files \u00b7 '+totalMB+' MB';const grid=document.getElementById('gallery-grid');grid.innerHTML='';if(!files.length){grid.innerHTML='<div class="empty">No media files found</div>';return}files.forEach(f=>{const c=document.createElement('div');c.className='m-card';const iv=f.type==='video';c.innerHTML='<div class="m-thumb" onclick="openLightbox(\''+f.name.replace(/'/g,"\\'")+"',"+iv+')"><img src="/api/thumb/'+encodeURIComponent(f.name)+'" loading="lazy" onerror="this.style.display=\'none\'">'+(iv?'<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>':'')+'</div><div class="m-info"><div class="m-name" title="'+f.name+'">'+f.name+'</div><div class="m-meta">'+f.size_mb+' MB \u00b7 '+f.date+'</div></div><div class="m-actions"><a class="btn" href="/media/'+encodeURIComponent(f.name)+'" download>download</a><button class="btn btn-danger" onclick="event.stopPropagation();deleteFile(\''+f.name.replace(/'/g,"\\'")+'\')">delete</button></div>';grid.appendChild(c)})}).catch(err=>{document.getElementById('gallery-grid').innerHTML='<div class="empty">Error loading gallery</div>'})}
+function loadGallery(){fetch('/api/media').then(r=>r.json()).then(files=>{const sort=document.getElementById('gallery-sort').value;const tf=document.getElementById('gallery-type').value;if(tf!=='all')files=files.filter(f=>f.type===tf);if(sort==='oldest')files.sort((a,b)=>a.mtime-b.mtime);else if(sort==='largest')files.sort((a,b)=>b.size-a.size);else if(sort==='name')files.sort((a,b)=>a.name.localeCompare(b.name));const totalMB=files.reduce((s,f)=>s+f.size_mb,0).toFixed(1);document.getElementById('gallery-stats').innerText=files.length+' files \u00b7 '+totalMB+' MB';const grid=document.getElementById('gallery-grid');grid.innerHTML='';if(!files.length){grid.innerHTML='<div class="empty">No media files found</div>';return}files.forEach(f=>{const c=document.createElement('div');c.className='m-card';const iv=f.type==='video';c.innerHTML='<div class="m-thumb" onclick="openLightbox(\''+f.name.replace(/'/g,"\\'")+"',"+iv+')"><img src="/api/thumb/'+encodeURIComponent(f.name)+'" loading="lazy" onerror="this.style.display=\'none\'">'+(iv?'<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>':'')+'</div><div class="m-info"><div class="m-name" title="'+f.name+'">'+f.name+'</div><div class="m-meta">'+f.size_mb+' MB \u00b7 '+f.date+'</div></div><div class="m-actions"><a class="btn" href="/media/'+encodeURIComponent(f.name)+'" download>Download</a><button class="btn btn-danger" onclick="event.stopPropagation();deleteFile(\''+f.name.replace(/'/g,"\\'")+'\')">Delete</button></div>';grid.appendChild(c)})}).catch(err=>{document.getElementById('gallery-grid').innerHTML='<div class="empty">Error loading gallery</div>'})}
 
 function openLightbox(n,iv){currentLightboxFile=n;const c=document.getElementById('lightbox-content');const u='/media/'+encodeURIComponent(n);c.innerHTML=iv?'<video src="'+u+'" controls autoplay style="max-width:100%;max-height:80vh"></video>':'<img src="'+u+'">';document.getElementById('lb-name').innerText=n;document.getElementById('lb-download').href=u;document.getElementById('lb-download').download=n;document.getElementById('lightbox').classList.add('open');fetch('/api/media').then(r=>r.json()).then(files=>{const f=files.find(x=>x.name===n);if(f)document.getElementById('lb-size').innerText=f.size_mb+' MB \u00b7 '+f.date})}
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.getElementById('lightbox-content').innerHTML='';currentLightboxFile=null}
