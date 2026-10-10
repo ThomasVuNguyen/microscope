@@ -362,6 +362,7 @@ def capture_highres_still():
         picam2.stop()
         config_video = picam2.create_video_configuration(
             main={"size": current_resolution},
+            raw={"size": (2328, 1748)},
             transform=Transform(hflip=True, vflip=True)
         )
         picam2.configure(config_video)
@@ -445,6 +446,7 @@ def change_resolution(width, height):
         picam2.stop()
         config = picam2.create_video_configuration(
             main={"size": (width, height)},
+            raw={"size": (2328, 1748)},
             transform=Transform(hflip=True, vflip=True)
         )
         picam2.configure(config)
@@ -484,6 +486,7 @@ def switch_stream_mode(width, height, qp):
         current_qp = qp
         config = picam2.create_video_configuration(
             main={"size": (width, height)},
+            raw={"size": (2328, 1748)},
             transform=Transform(hflip=True, vflip=True)
         )
         picam2.configure(config)
@@ -1669,6 +1672,7 @@ def main():
     picam2 = Picamera2()
     config = picam2.create_video_configuration(
         main={"size": current_resolution},
+        raw={"size": (2328, 1748)},
         transform=Transform(hflip=True, vflip=True)
     )
     picam2.configure(config)
