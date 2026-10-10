@@ -762,11 +762,11 @@ PAGE_HTML = r"""<!DOCTYPE html>
     /* ─── STREAM VIEWPORT ─── */
     .s-viewport {
       position: relative; width: 100%;
-      background: #000; overflow: hidden; aspect-ratio: 16/9;
+      background: #000; overflow: hidden; aspect-ratio: 4/3;
       cursor: crosshair;
       border: 1px solid var(--s-line);
     }
-    canvas#view-canvas { width: 100%; height: 100%; display: block; }
+    canvas#view-canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
 
     /* ─── HUD ─── */
     .hud {
