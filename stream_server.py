@@ -96,6 +96,7 @@ recording_proc = None
 recording_thread = None
 recording_filename = None
 current_resolution = (1280, 720)
+current_qp = 10  # MJPEG quality: lower=better image, higher=faster stream (3-31)
 
 MEDIA_DIR = "/home/thomas/microscope"
 THUMB_DIR = os.path.join(MEDIA_DIR, ".thumbs")
@@ -361,7 +362,7 @@ def capture_highres_still():
         picam2.configure(config_video)
         picam2.start()
         apply_all_controls()
-        encoder = LibavMjpegEncoder(framerate=30)
+        encoder = LibavMjpegEncoder(framerate=30, qp=current_qp)
         picam2.start_recording(encoder, FileOutput(output))
 
         duration = round(time.time() - t0, 2)
@@ -445,10 +446,26 @@ def change_resolution(width, height):
         picam2.start()
         current_resolution = (width, height)
         apply_all_controls()
-        encoder = LibavMjpegEncoder(framerate=30)
+        encoder = LibavMjpegEncoder(framerate=30, qp=current_qp)
         picam2.start_recording(encoder, FileOutput(output))
-    logging.info("✅ [Resolution] Now streaming at %dx%d", width, height)
-    return {"status": "ok", "resolution": [width, height]}
+    logging.info("✅ [Resolution] Now streaming at %dx%d (qp=%d)", width, height, current_qp)
+    return {"status": "ok", "resolution": [width, height], "qp": current_qp}
+
+
+def change_stream_quality(qp):
+    """Change MJPEG quality by restarting encoder with new QP value."""
+    global current_qp
+    qp = max(2, min(31, qp))
+    with camera_lock:
+        logging.info("🎨 [Quality] Switching to qp=%d...", qp)
+        picam2.stop_recording()
+        picam2.stop()
+        current_qp = qp
+        picam2.start()
+        encoder = LibavMjpegEncoder(framerate=30, qp=current_qp)
+        picam2.start_recording(encoder, FileOutput(output))
+    logging.info("✅ [Quality] Now streaming at qp=%d", current_qp)
+    return {"status": "ok", "qp": current_qp}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1186,6 +1203,8 @@ PAGE_HTML = r"""<!DOCTYPE html>
           <div class="s-ctrl s-ctrl-wide"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
           <div class="s-ctrl s-ctrl-wide"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
           <div class="s-ctrl s-ctrl-wide"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 \u00d7 480</option><option value="1280x720" selected>1280 \u00d7 720</option><option value="1920x1080">1920 \u00d7 1080</option></select></div>
+          <div class="s-ctrl"><label>Stream QP</label><input type="range" id="sl-qp" min="2" max="31" value="10" oninput="document.getElementById('v-qp').innerText=this.value" onchange="changeQP(this.value)"><span class="val" id="v-qp">10</span></div>
+          <div class="s-ctrl s-ctrl-wide"><label>Fast Stream</label><label class="toggle"><input type="checkbox" id="fast-stream" onchange="toggleFastStream(this.checked)"><span></span></label></div>
           <div class="s-ctrl"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val" id="v-zoom">1.0x</span></div>
           <div class="s-ctrl s-ctrl-right" style="margin-top:4px"><span></span><button class="btn" onclick="resetDefaults()">Reset All Defaults</button></div>
         </div>
@@ -1265,11 +1284,13 @@ function capture16MP(){if(isBusy)return;isBusy=true;statusMsg.innerText='Capturi
 function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record';b.classList.remove('danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop';b.classList.add('danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
 
 function changeResolution(v){const[w,h]=v.split('x').map(Number);statusMsg.innerText='Switching to '+w+'\u00d7'+h+'...';fetch('/api/resolution?width='+w+'&height='+h).then(r=>r.json()).then(d=>{statusMsg.innerText='Resolution: '+d.resolution[0]+'\u00d7'+d.resolution[1]}).catch(err=>{statusMsg.innerText='Error: '+err})}
+function changeQP(v){statusMsg.innerText='Setting stream quality...';fetch('/api/stream_quality?qp='+v).then(r=>r.json()).then(d=>{statusMsg.innerText='Stream QP: '+d.qp+' (lower=sharper, higher=faster)'}).catch(err=>{statusMsg.innerText='Error: '+err})}
+function toggleFastStream(on){statusMsg.innerText=on?'Switching to fast stream...':'Switching to quality stream...';fetch('/api/perf_mode?mode='+(on?'fast':'quality')).then(r=>r.json()).then(d=>{statusMsg.innerText=d.mode==='fast'?'Fast Stream: 640\u00d7480 qp=20':'Quality: 1280\u00d7720 qp=10';syncControlsFromServer()}).catch(err=>{statusMsg.innerText='Error: '+err})}
 function resetDefaults(){fetch('/api/reset_defaults').then(r=>r.json()).then(()=>{statusMsg.innerText='All controls reset';setTimeout(syncControlsFromServer,200)})}
 
-function syncControlsFromServer(){fetch('/api/controls').then(r=>r.json()).then(d=>{document.getElementById('ae-enable').checked=d.AeEnable;document.getElementById('awb-enable').checked=d.AwbEnable;document.getElementById('sel-awb').value=d.AwbMode;document.getElementById('sel-metering').value=d.AeMeteringMode;document.getElementById('sel-aemode').value=d.AeExposureMode;document.getElementById('sel-nr').value=d.NoiseReductionMode;document.getElementById('sel-hdr').value=d.HdrMode;document.getElementById('sl-brightness').value=Math.round(d.Brightness*100);document.getElementById('v-brightness').innerText=d.Brightness.toFixed(2);document.getElementById('sl-contrast').value=Math.round(d.Contrast*100);document.getElementById('v-contrast').innerText=d.Contrast.toFixed(2);document.getElementById('sl-saturation').value=Math.round(d.Saturation*100);document.getElementById('v-saturation').innerText=d.Saturation.toFixed(2);document.getElementById('sl-sharpness').value=Math.round(d.Sharpness*100);document.getElementById('v-sharpness').innerText=d.Sharpness.toFixed(2);document.getElementById('sl-gain').value=Math.round(d.AnalogueGain*10);document.getElementById('v-gain').innerText=d.AnalogueGain.toFixed(1);document.getElementById('sl-ev').value=Math.round(d.ExposureValue*10);document.getElementById('v-ev').innerText=d.ExposureValue.toFixed(1);document.getElementById('sl-exposure').value=exposureToSlider(d.ExposureTime);document.getElementById('v-exposure').innerText=d.ExposureTime;document.getElementById('sl-rgain').value=Math.round(d.ColourGainRed*100);document.getElementById('v-rgain').innerText=d.ColourGainRed.toFixed(2);document.getElementById('sl-bgain').value=Math.round(d.ColourGainBlue*100);document.getElementById('v-bgain').innerText=d.ColourGainBlue.toFixed(2);document.getElementById('sl-zoom').value=Math.round(d.DigitalZoom*100);document.getElementById('v-zoom').innerText=d.DigitalZoom.toFixed(1)+'x';document.getElementById('focus-slider').value=Math.round(d.focus*100);document.getElementById('focus-label').innerText=d.focus.toFixed(2);const rv=d.resolution[0]+'x'+d.resolution[1];const rs=document.getElementById('sel-res');if([...rs.options].some(o=>o.value===rv))rs.value=rv;updateAeUI();updateAwbUI()}).catch(()=>{})}
+function syncControlsFromServer(){fetch('/api/controls').then(r=>r.json()).then(d=>{document.getElementById('ae-enable').checked=d.AeEnable;document.getElementById('awb-enable').checked=d.AwbEnable;document.getElementById('sel-awb').value=d.AwbMode;document.getElementById('sel-metering').value=d.AeMeteringMode;document.getElementById('sel-aemode').value=d.AeExposureMode;document.getElementById('sel-nr').value=d.NoiseReductionMode;document.getElementById('sel-hdr').value=d.HdrMode;document.getElementById('sl-brightness').value=Math.round(d.Brightness*100);document.getElementById('v-brightness').innerText=d.Brightness.toFixed(2);document.getElementById('sl-contrast').value=Math.round(d.Contrast*100);document.getElementById('v-contrast').innerText=d.Contrast.toFixed(2);document.getElementById('sl-saturation').value=Math.round(d.Saturation*100);document.getElementById('v-saturation').innerText=d.Saturation.toFixed(2);document.getElementById('sl-sharpness').value=Math.round(d.Sharpness*100);document.getElementById('v-sharpness').innerText=d.Sharpness.toFixed(2);document.getElementById('sl-gain').value=Math.round(d.AnalogueGain*10);document.getElementById('v-gain').innerText=d.AnalogueGain.toFixed(1);document.getElementById('sl-ev').value=Math.round(d.ExposureValue*10);document.getElementById('v-ev').innerText=d.ExposureValue.toFixed(1);document.getElementById('sl-exposure').value=exposureToSlider(d.ExposureTime);document.getElementById('v-exposure').innerText=d.ExposureTime;document.getElementById('sl-rgain').value=Math.round(d.ColourGainRed*100);document.getElementById('v-rgain').innerText=d.ColourGainRed.toFixed(2);document.getElementById('sl-bgain').value=Math.round(d.ColourGainBlue*100);document.getElementById('v-bgain').innerText=d.ColourGainBlue.toFixed(2);document.getElementById('sl-zoom').value=Math.round(d.DigitalZoom*100);document.getElementById('v-zoom').innerText=d.DigitalZoom.toFixed(1)+'x';document.getElementById('focus-slider').value=Math.round(d.focus*100);document.getElementById('focus-label').innerText=d.focus.toFixed(2);const rv=d.resolution[0]+'x'+d.resolution[1];const rs=document.getElementById('sel-res');if([...rs.options].some(o=>o.value===rv))rs.value=rv;if(d.qp!==undefined){document.getElementById('sl-qp').value=d.qp;document.getElementById('v-qp').innerText=d.qp;document.getElementById('fast-stream').checked=(d.qp>=20&&d.resolution[0]<=640)}updateAeUI();updateAwbUI()}).catch(()=>{})}
 
-async function startStream(){try{const response=await fetch('/stream.mjpg');const reader=response.body.getReader();let buffer=new Uint8Array(0);while(true){const{done,value}=await reader.read();if(done)break;const nb=new Uint8Array(buffer.length+value.length);nb.set(buffer);nb.set(value,buffer.length);buffer=nb;let soi=-1,eoi=-1;for(let i=0;i<buffer.length-1;i++){if(buffer[i]===0xFF&&buffer[i+1]===0xD8)soi=i;if(soi!==-1&&buffer[i]===0xFF&&buffer[i+1]===0xD9){eoi=i+2;break}}if(soi!==-1&&eoi!==-1){const fb=buffer.slice(soi,eoi);buffer=buffer.slice(eoi);const blob=new Blob([fb],{type:'image/jpeg'});createImageBitmap(blob).then(bmp=>{if(canvas.width!==bmp.width){canvas.width=bmp.width;canvas.height=bmp.height}ctx.drawImage(bmp,0,0);bmp.close();frameCount++;const now=performance.now();if(now-lastFpsTime>=1000){fps=Math.round((frameCount*1000)/(now-lastFpsTime));frameCount=0;lastFpsTime=now;if(!isBusy)hud.innerText=fps+' fps'}}).catch(()=>{})}if(buffer.length>250000)buffer=new Uint8Array(0)}}catch(err){setTimeout(startStream,800)}}
+async function startStream(){try{const response=await fetch('/stream.mjpg');const reader=response.body.getReader();let buffer=new Uint8Array(0);while(true){const{done,value}=await reader.read();if(done)break;const nb=new Uint8Array(buffer.length+value.length);nb.set(buffer);nb.set(value,buffer.length);buffer=nb;let lastSoi=-1,lastEoi=-1;for(let i=0;i<buffer.length-1;i++){if(buffer[i]===0xFF&&buffer[i+1]===0xD8)lastSoi=i;if(lastSoi!==-1&&buffer[i]===0xFF&&buffer[i+1]===0xD9){lastEoi=i+2}}if(lastSoi!==-1&&lastEoi!==-1&&lastEoi>lastSoi){const fb=buffer.slice(lastSoi,lastEoi);buffer=buffer.slice(lastEoi);const blob=new Blob([fb],{type:'image/jpeg'});createImageBitmap(blob).then(bmp=>{if(canvas.width!==bmp.width){canvas.width=bmp.width;canvas.height=bmp.height}ctx.drawImage(bmp,0,0);bmp.close();frameCount++;const now=performance.now();if(now-lastFpsTime>=1000){fps=Math.round((frameCount*1000)/(now-lastFpsTime));frameCount=0;lastFpsTime=now;if(!isBusy)hud.innerText=fps+' fps'}}).catch(()=>{})}if(buffer.length>500000)buffer=new Uint8Array(0)}}catch(err){setTimeout(startStream,800)}}
 startStream();
 
 function updateMetrics(){if(isBusy||pollingPaused)return;fetch('/api/metrics').then(r=>r.json()).then(d=>{document.getElementById('sharp-val').innerText=d.sharpness;document.getElementById('peak-val').innerText=d.peak;let pct=Math.min(100,(d.sharpness/Math.max(d.peak,1))*100);document.getElementById('meter-fill').style.width=pct+'%';if(document.getElementById('ae-enable').checked&&d.actual_exposure){document.getElementById('v-exposure').innerText=d.actual_exposure;document.getElementById('v-gain').innerText=d.actual_gain.toFixed(1)}if(document.getElementById('awb-enable').checked&&d.actual_colour_gains){document.getElementById('v-rgain').innerText=d.actual_colour_gains[0].toFixed(2);document.getElementById('v-bgain').innerText=d.actual_colour_gains[1].toFixed(2)}}).catch(()=>{})}
@@ -1438,6 +1459,7 @@ class StreamingHandler(BaseHTTPRequestHandler):
             data["fps"] = round(output.fps, 1)
             data["recording"] = recording_active
             data["resolution"] = list(current_resolution)
+            data["qp"] = current_qp
             self._json_response(data)
 
         # ─── API: Camera Info (for AI agents) ───
@@ -1468,9 +1490,10 @@ class StreamingHandler(BaseHTTPRequestHandler):
 
         # ─── API: Focus (legacy compat) ───
         elif path == "/api/focus":
-            if "dpt" in qs:
-                set_camera_control("LensPosition", qs["dpt"][0])
-            self._json_response({"status": "ok"})
+            dpt_val = qs.get("dpt", qs.get("pos", [None]))[0]
+            if dpt_val is not None:
+                set_camera_control("LensPosition", dpt_val)
+            self._json_response({"status": "ok", "focus": round(current_focus_pos, 2)})
 
         # ─── API: Spot Autofocus ───
         elif path in ("/api/focus_spot", "/api/sweep_spot"):
@@ -1508,6 +1531,31 @@ class StreamingHandler(BaseHTTPRequestHandler):
             h = int(qs.get("height", [720])[0])
             try:
                 res = change_resolution(w, h)
+                self._json_response(res)
+            except Exception as e:
+                self._json_response({"status": "error", "message": str(e)}, 500)
+
+        # ─── API: Stream Quality ───
+        elif path == "/api/stream_quality":
+            qp_val = int(qs.get("qp", [10])[0])
+            try:
+                res = change_stream_quality(qp_val)
+                self._json_response(res)
+            except Exception as e:
+                self._json_response({"status": "error", "message": str(e)}, 500)
+
+        # ─── API: Performance Mode (low-res + high compression) ───
+        elif path == "/api/perf_mode":
+            mode = qs.get("mode", ["fast"])[0]
+            try:
+                if mode == "fast":
+                    change_stream_quality(20)
+                    res = change_resolution(640, 480)
+                    res["mode"] = "fast"
+                else:
+                    change_stream_quality(10)
+                    res = change_resolution(1280, 720)
+                    res["mode"] = "quality"
                 self._json_response(res)
             except Exception as e:
                 self._json_response({"status": "error", "message": str(e)}, 500)
@@ -1596,7 +1644,7 @@ def main():
     except Exception as e:
         logging.warning("Could not set initial focus: %s", e)
 
-    encoder = LibavMjpegEncoder(framerate=30)
+    encoder = LibavMjpegEncoder(framerate=30, qp=current_qp)
     picam2.start_recording(encoder, FileOutput(output))
 
     server_address = ("0.0.0.0", 1306)
