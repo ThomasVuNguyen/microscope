@@ -538,830 +538,337 @@ PAGE_HTML = r"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Microscope Control Station</title>
+    <title>Microscope</title>
     <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #111; color: #eee; margin: 0; padding: 12px;
-            display: flex; flex-direction: column; align-items: center;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        :root{
+            --bg:#09090b;--card:#18181b;--border:#27272a;--border-lt:#3f3f46;
+            --text:#fafafa;--text2:#a1a1aa;--text3:#71717a;
+            --blue:#3b82f6;--blue-h:#2563eb;--blue-dim:rgba(59,130,246,.12);
+            --green:#22c55e;--red:#ef4444;--red-dim:rgba(239,68,68,.12);
+            --radius:10px;--radius-sm:6px;
         }
-        h1 { margin: 0 0 6px; font-size: 1.25rem; color: #64b5f6; display: flex; align-items: center; gap: 8px; }
-        .badge-live { background: #e53935; color: #fff; font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+        body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:16px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+        .mono{font-family:'JetBrains Mono','Courier New',monospace}
 
-        /* ─── Tabs ─── */
-        .tabs { display: flex; gap: 4px; margin: 6px 0; max-width: 960px; width: 100%; }
-        .tab-btn {
-            flex: 1; padding: 8px 16px; background: #1e1e1e; border: none; color: #888;
-            font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 6px 6px 0 0;
-            transition: all 0.15s;
-        }
-        .tab-btn.active { background: #2a2a2a; color: #64b5f6; border-bottom: 2px solid #64b5f6; }
-        .tab-btn:hover:not(.active) { color: #aaa; }
-        .tab-content { display: none; width: 100%; max-width: 960px; }
-        .tab-content.active { display: flex; flex-direction: column; align-items: center; }
+        /* ── Header ── */
+        header{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin-bottom:12px}
+        .logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.1rem;color:var(--text)}
+        .logo svg{color:var(--blue);flex-shrink:0}
+        .tabs{display:flex;gap:2px;background:var(--card);border-radius:var(--radius-sm);padding:3px;border:1px solid var(--border)}
+        .tab-btn{padding:7px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;border-radius:4px;transition:all .15s}
+        .tab-btn.active{background:var(--blue);color:#fff}
+        .tab-btn:hover:not(.active){color:var(--text2)}
+        .tab-content{display:none;width:100%;max-width:960px;flex-direction:column;align-items:center}
+        .tab-content.active{display:flex}
 
-        /* ─── Stream ─── */
-        .stream-container {
-            position: relative; max-width: 960px; width: 100%; background: #000;
-            border-radius: 0 0 8px 8px; overflow: hidden;
-            box-shadow: 0 4px 25px rgba(0,0,0,0.8); aspect-ratio: 16/9; cursor: crosshair;
-        }
-        canvas#view-canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
-        .hud-overlay {
-            position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.75);
-            padding: 5px 12px; border-radius: 4px; font-family: monospace; font-size: 0.82rem;
-            color: #00e676; pointer-events: none; transition: all 0.2s;
-        }
-        .hud-overlay.busy { color: #ffb300; background: rgba(40,25,0,0.85); border: 1px solid #ffb300; }
-        .rec-badge {
-            position: absolute; top: 10px; right: 10px; background: #e53935; color: #fff;
-            padding: 3px 10px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;
-            animation: rec-blink 1s infinite; display: none;
-        }
-        @keyframes rec-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .reticle {
-            position: absolute; width: 70px; height: 70px; border: 2px dashed #00e676;
-            border-radius: 6px; transform: translate(-50%,-50%); pointer-events: none;
-            transition: left 0.15s ease-out, top 0.15s ease-out, border-color 0.2s;
-            box-shadow: 0 0 10px rgba(0,230,118,0.5);
-        }
-        .reticle::after {
-            content: "+"; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%,-50%); color: #00e676; font-size: 18px; font-weight: bold;
-        }
-        .reticle.focusing { border: 2px solid #ffb300; box-shadow: 0 0 20px #ffb300; animation: pulse-ring 0.8s infinite alternate; }
-        .reticle.focusing::after { color: #ffb300; }
-        .reticle.focused { border: 2px solid #00e676; box-shadow: 0 0 25px #00e676; }
-        @keyframes pulse-ring { 0% { transform: translate(-50%,-50%) scale(0.95); } 100% { transform: translate(-50%,-50%) scale(1.08); } }
+        /* ── Stream ── */
+        .stream-wrap{position:relative;width:100%;background:#000;border-radius:var(--radius);overflow:hidden;aspect-ratio:16/9;cursor:crosshair;border:1px solid var(--border)}
+        canvas#view-canvas{width:100%;height:100%;display:block}
+        .hud{position:absolute;top:8px;left:8px;padding:4px 10px;border-radius:4px;font-size:.72rem;letter-spacing:.02em;pointer-events:none;transition:all .2s}
+        .hud{background:rgba(0,0,0,.6);color:var(--text2);backdrop-filter:blur(4px)}
+        .hud.busy{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+        .rec-dot{position:absolute;top:8px;right:8px;display:none;align-items:center;gap:5px;background:var(--red-dim);color:var(--red);padding:4px 10px;border-radius:4px;font-size:.72rem;font-weight:600;border:1px solid rgba(239,68,68,.3)}
+        .rec-dot::before{content:'';width:7px;height:7px;background:var(--red);border-radius:50%;animation:blink 1s infinite}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+        .reticle{position:absolute;width:56px;height:56px;border:1.5px solid var(--blue);border-radius:var(--radius-sm);transform:translate(-50%,-50%);pointer-events:none;transition:all .15s ease-out;opacity:.8}
+        .reticle::before,.reticle::after{content:'';position:absolute;background:var(--blue)}
+        .reticle::before{width:1px;height:12px;left:50%;top:50%;transform:translate(-50%,-50%)}
+        .reticle::after{width:12px;height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+        .reticle.focusing{border-color:var(--blue);box-shadow:0 0 20px rgba(59,130,246,.4);animation:pulse .8s infinite alternate;opacity:1}
+        .reticle.focused{border-color:var(--green);opacity:1}
+        .reticle.focused::before,.reticle.focused::after{background:var(--green)}
+        @keyframes pulse{0%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1.06)}}
 
-        /* ─── Meter ─── */
-        .meter-card {
-            width: 100%; background: #1e1e1e; margin-top: 6px; padding: 6px 14px;
-            border-radius: 6px; display: flex; flex-direction: column; gap: 4px;
-        }
-        .meter-header { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; }
-        .meter-bar-container { width: 100%; height: 10px; background: #2c2c2c; border-radius: 5px; overflow: hidden; }
-        .meter-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #f44336, #ffeb3b, #4caf50); transition: width 0.15s; }
+        /* ── Meter ── */
+        .meter{width:100%;background:var(--card);margin-top:8px;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;gap:12px}
+        .meter-label{font-size:.78rem;color:var(--text3);white-space:nowrap}
+        .meter-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+        .meter-fill{height:100%;width:0;background:var(--blue);border-radius:2px;transition:width .2s}
+        .meter .mono{font-size:.78rem;color:var(--blue)}
+        .meter-peak{font-size:.72rem;color:var(--text3)}
+        .meter-reset{background:none;border:1px solid var(--border);color:var(--text3);padding:2px 8px;border-radius:3px;font-size:.65rem;cursor:pointer;font-family:inherit}
+        .meter-reset:hover{border-color:var(--text3)}
 
-        /* ─── Action Row ─── */
-        .action-row {
-            margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
-            align-items: center; width: 100%; background: #1e1e1e; padding: 8px 12px; border-radius: 6px;
-        }
-        button, a.btn {
-            background: #1976d2; color: #fff; border: none; padding: 7px 12px; border-radius: 4px;
-            cursor: pointer; font-weight: 600; text-decoration: none; font-size: 0.8rem;
-            transition: background 0.15s, transform 0.05s; display: inline-flex; align-items: center; gap: 4px;
-        }
-        button:hover, a.btn:hover { background: #1565c0; }
-        button:active, a.btn:active { transform: scale(0.98); }
-        button.success { background: #2e7d32; } button.success:hover { background: #1b5e20; }
-        button.warning { background: #e65100; } button.warning:hover { background: #bf360c; }
-        button.danger { background: #c62828; } button.danger:hover { background: #b71c1c; }
-        button.nudge { background: #37474f; padding: 6px 9px; font-family: monospace; font-size: 0.8rem; }
-        button.nudge:hover { background: #455a64; }
-        button.sm { padding: 2px 7px; font-size: 0.7rem; background: #424242; }
-        button:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.6; }
+        /* ── Focus Row ── */
+        .focus-bar{width:100%;background:var(--card);margin-top:6px;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .focus-bar input[type=range]{flex:1;min-width:100px}
 
-        /* ─── Focus Slider Row ─── */
-        .focus-row { display: flex; align-items: center; gap: 6px; }
-        .focus-row input[type=range] { width: 120px; cursor: pointer; }
-        .focus-row .val { font-family: monospace; min-width: 40px; color: #64b5f6; font-size: 0.82rem; }
+        /* ── Actions ── */
+        .actions{width:100%;display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:500;cursor:pointer;transition:all .12s;text-decoration:none;white-space:nowrap}
+        .btn:hover{border-color:var(--border-lt);background:#27272a}
+        .btn:active{transform:scale(.98)}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+        .btn svg{width:15px;height:15px;flex-shrink:0}
+        .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff}
+        .btn-primary:hover{background:var(--blue-h);border-color:var(--blue-h)}
+        .btn-danger{background:var(--red-dim);border-color:rgba(239,68,68,.3);color:var(--red)}
+        .btn-danger:hover{background:rgba(239,68,68,.2)}
+        .btn-sm{padding:5px 10px;font-size:.72rem}
+        .btn-nudge{padding:6px 10px;font-weight:500;font-size:.78rem}
+        .btn-nudge .mono{font-size:.75rem}
+        .actions .spacer{flex:1}
 
-        /* ─── Controls Grid ─── */
-        .controls-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 6px; width: 100%; margin-top: 6px;
-        }
-        details.ctrl-section {
-            background: #1e1e1e; border-radius: 6px; overflow: hidden;
-        }
-        details.ctrl-section summary {
-            padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
-            color: #90caf9; list-style: none; user-select: none;
-            display: flex; align-items: center; gap: 6px;
-        }
-        details.ctrl-section summary::-webkit-details-marker { display: none; }
-        details.ctrl-section summary::before { content: "▶"; font-size: 0.6rem; transition: transform 0.2s; }
-        details.ctrl-section[open] summary::before { transform: rotate(90deg); }
-        .ctrl-body { padding: 2px 12px 10px; }
-        .ctrl-row {
-            display: flex; align-items: center; gap: 6px; margin: 5px 0; font-size: 0.8rem;
-        }
-        .ctrl-row label { min-width: 80px; color: #aaa; font-size: 0.78rem; }
-        .ctrl-row input[type=range] { flex: 1; min-width: 70px; cursor: pointer; }
-        .ctrl-row .val { min-width: 48px; font-family: monospace; color: #64b5f6; text-align: right; font-size: 0.78rem; }
-        .ctrl-row select {
-            flex: 1; background: #333; color: #eee; border: 1px solid #555;
-            padding: 3px 6px; border-radius: 4px; font-size: 0.78rem; cursor: pointer;
-        }
-        /* Toggle Switch */
-        .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .switch .sl {
-            position: absolute; cursor: pointer; inset: 0; background: #555;
-            border-radius: 20px; transition: 0.3s;
-        }
-        .switch .sl::before {
-            content: ""; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px;
-            background: #fff; border-radius: 50%; transition: 0.3s;
-        }
-        .switch input:checked + .sl { background: #4caf50; }
-        .switch input:checked + .sl::before { transform: translateX(16px); }
+        /* ── Controls Grid ── */
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px;width:100%;margin-top:6px}
+        .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+        .panel-head{padding:10px 14px;font-size:.8rem;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;list-style:none}
+        .panel-head svg{width:16px;height:16px;color:var(--blue);flex-shrink:0}
+        .panel-head::after{content:'';margin-left:auto;width:16px;height:16px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");transition:transform .2s}
+        details[open] .panel-head::after{transform:rotate(180deg)}
+        details.panel:not([open]) .panel-head{border-bottom:none}
+        .panel-body{padding:4px 14px 14px}
+        .row{display:flex;align-items:center;gap:8px;min-height:32px}
+        .row+.row{margin-top:2px}
+        .row label{min-width:78px;font-size:.76rem;color:var(--text3)}
+        .row input[type=range]{flex:1;min-width:60px;accent-color:var(--blue);cursor:pointer}
+        .row .val{min-width:48px;text-align:right;font-size:.75rem;color:var(--text2)}
+        .row select{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:var(--radius-sm);font-family:inherit;font-size:.76rem;cursor:pointer;outline:none}
+        .row select:focus{border-color:var(--blue)}
 
-        /* ─── Status ─── */
-        #status-msg {
-            color: #81c784; font-size: 0.8rem; min-height: 1.2rem; margin-top: 4px;
-            text-align: center; font-weight: 500; max-width: 960px;
-        }
+        /* ── Toggle ── */
+        .toggle{position:relative;width:34px;height:20px;flex-shrink:0}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle span{position:absolute;inset:0;background:var(--border-lt);border-radius:10px;cursor:pointer;transition:.2s}
+        .toggle span::before{content:'';position:absolute;width:14px;height:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+        .toggle input:checked+span{background:var(--blue)}
+        .toggle input:checked+span::before{transform:translateX(14px)}
 
-        /* ─── Gallery ─── */
-        .gallery-bar {
-            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-            width: 100%; background: #1e1e1e; padding: 8px 12px; border-radius: 6px; margin-bottom: 8px;
-        }
-        .gallery-bar select { background: #333; color: #eee; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; }
-        .gallery-bar .stats { margin-left: auto; color: #888; font-size: 0.78rem; }
-        .gallery-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 10px; width: 100%;
-        }
-        .media-card {
-            background: #1e1e1e; border-radius: 6px; overflow: hidden;
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-        .media-card:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .thumb-wrap {
-            position: relative; width: 100%; aspect-ratio: 4/3; background: #000;
-            cursor: pointer; overflow: hidden;
-        }
-        .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
-        .thumb-wrap .play-icon {
-            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-            font-size: 2.5rem; color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.3);
-        }
-        .media-info { padding: 6px 10px; }
-        .media-name { font-size: 0.78rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-        .media-meta { font-size: 0.72rem; color: #777; margin-top: 2px; }
-        .media-actions { display: flex; gap: 4px; padding: 0 10px 8px; }
-        .media-actions a, .media-actions button {
-            font-size: 0.72rem; padding: 3px 8px; background: #333; border: none; border-radius: 3px;
-            color: #ccc; cursor: pointer; text-decoration: none;
-        }
-        .media-actions a:hover, .media-actions button:hover { background: #444; }
-        .media-actions button.del:hover { background: #c62828; color: #fff; }
+        /* ── Status ── */
+        #status-msg{width:100%;max-width:960px;font-size:.76rem;color:var(--text3);min-height:1.4rem;margin-top:8px;text-align:center}
 
-        /* ─── Lightbox ─── */
-        .lightbox {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92);
-            z-index: 1000; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
-        }
-        .lightbox.open { display: flex; }
-        .lightbox-close {
-            position: absolute; top: 15px; right: 20px; font-size: 2rem; color: #fff;
-            cursor: pointer; z-index: 1001; line-height: 1;
-        }
-        .lightbox-content { max-width: 95vw; max-height: 80vh; }
-        .lightbox-content img, .lightbox-content video { max-width: 100%; max-height: 80vh; border-radius: 4px; }
-        .lightbox-bar {
-            display: flex; align-items: center; gap: 12px; margin-top: 10px; color: #ccc; font-size: 0.85rem;
-        }
-        .lightbox-bar a { color: #64b5f6; text-decoration: none; }
+        /* ── Gallery ── */
+        .gallery-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;margin-bottom:8px}
+        .gallery-toolbar select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:var(--radius-sm);font-family:inherit;font-size:.78rem}
+        .gallery-toolbar .stats{margin-left:auto;font-size:.76rem;color:var(--text3)}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;width:100%}
+        .m-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s}
+        .m-card:hover{border-color:var(--border-lt)}
+        .m-thumb{position:relative;width:100%;aspect-ratio:4/3;background:var(--bg);cursor:pointer;overflow:hidden}
+        .m-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .2s}
+        .m-card:hover .m-thumb img{transform:scale(1.03)}
+        .m-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
+        .m-thumb .play svg{width:36px;height:36px;color:#fff;opacity:.9}
+        .m-info{padding:8px 10px 4px}
+        .m-name{font-size:.74rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .m-meta{font-size:.68rem;color:var(--text3);margin-top:2px}
+        .m-actions{display:flex;gap:4px;padding:4px 10px 10px}
+        .m-actions .btn{padding:3px 8px;font-size:.7rem}
+        .empty{grid-column:1/-1;text-align:center;color:var(--text3);padding:60px 20px;font-size:.85rem}
 
-        .empty-gallery { grid-column: 1/-1; text-align: center; color: #666; padding: 60px 20px; font-size: 0.9rem; }
+        /* ── Lightbox ── */
+        .lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1000;flex-direction:column;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)}
+        .lb.open{display:flex}
+        .lb-close{position:absolute;top:12px;right:16px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.08);border:none;color:#fff;font-size:1.2rem;cursor:pointer;transition:background .15s}
+        .lb-close:hover{background:rgba(255,255,255,.15)}
+        .lb-body{max-width:95vw;max-height:80vh}
+        .lb-body img,.lb-body video{max-width:100%;max-height:80vh;border-radius:var(--radius-sm)}
+        .lb-bar{display:flex;align-items:center;gap:14px;margin-top:12px;font-size:.82rem;color:var(--text2)}
+        .lb-bar a{color:var(--blue);text-decoration:none}
     </style>
 </head>
 <body>
-    <h1>🔬 Microscope Control Station <span class="badge-live">LIVE</span></h1>
 
+<header>
+    <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Microscope
+    </div>
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('live', this)">🔴 Live Stream</button>
-        <button class="tab-btn" onclick="switchTab('gallery', this)">📸 Gallery</button>
+        <button class="tab-btn active" onclick="switchTab('live',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>Live
+        </button>
+        <button class="tab-btn" onclick="switchTab('gallery',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-3.09-3.09a2 2 0 00-2.82 0L6 21"/></svg>Gallery
+        </button>
+    </div>
+</header>
+
+<!-- ═══ LIVE TAB ═══ -->
+<div id="tab-live" class="tab-content active">
+    <div class="stream-wrap" id="container">
+        <canvas id="view-canvas"></canvas>
+        <div class="hud" id="hud">Connecting...</div>
+        <div class="rec-dot" id="rec-badge">REC</div>
+        <div class="reticle" id="reticle" style="top:50%;left:50%"></div>
     </div>
 
-    <!-- ═══ LIVE STREAM TAB ═══ -->
-    <div id="tab-live" class="tab-content active">
-        <div class="stream-container" id="container">
-            <canvas id="view-canvas"></canvas>
-            <div class="hud-overlay" id="hud">FPS: -- | Click to Focus</div>
-            <div class="rec-badge" id="rec-badge">⏺ REC</div>
-            <div class="reticle" id="reticle" style="top:50%;left:50%;"></div>
-        </div>
+    <div class="meter">
+        <span class="meter-label">Sharpness</span>
+        <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
+        <span class="mono" id="sharp-val">0.0</span>
+        <span class="meter-peak">peak <span id="peak-val">0.0</span></span>
+        <button class="meter-reset" onclick="fetch('/api/reset_peak')">Reset</button>
+    </div>
 
-        <div class="meter-card">
-            <div class="meter-header">
-                <span>Spot Sharpness: <span id="sharp-val" style="color:#64b5f6;">0.0</span></span>
-                <span>Peak: <span id="peak-val" style="color:#4caf50;">0.0</span>
-                    <button class="sm" onclick="fetch('/api/reset_peak')">Reset</button>
-                </span>
+    <div class="focus-bar">
+        <span style="font-size:.78rem;color:var(--text3)">Focus</span>
+        <button class="btn btn-nudge" onclick="nudgeFocus(-0.20)"><span class="mono">−.20</span></button>
+        <button class="btn btn-nudge" onclick="nudgeFocus(-0.05)"><span class="mono">−.05</span></button>
+        <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
+        <span class="mono val" id="focus-label" style="min-width:42px;text-align:center;color:var(--text)">1.60</span>
+        <span style="font-size:.68rem;color:var(--text3)">dpt</span>
+        <button class="btn btn-nudge" onclick="nudgeFocus(0.05)"><span class="mono">+.05</span></button>
+        <button class="btn btn-nudge" onclick="nudgeFocus(0.20)"><span class="mono">+.20</span></button>
+    </div>
+
+    <div class="actions">
+        <button class="btn" id="btn-refocus" onclick="triggerSpotFocus(targetX,targetY)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>Autofocus
+        </button>
+        <button class="btn" id="btn-broad" onclick="triggerSpotFocus(targetX,targetY,true)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Broad Scan
+        </button>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="btn-snap" onclick="capture16MP()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Capture 16MP
+        </button>
+        <button class="btn" id="btn-rec" onclick="toggleRecording()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record
+        </button>
+        <a class="btn" id="btn-dl" href="/download_latest" target="_blank" style="display:none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
+        </a>
+    </div>
+
+    <!-- ── Control Panels ── -->
+    <div class="grid">
+        <details class="panel" open>
+            <summary class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                Exposure
+            </summary>
+            <div class="panel-body">
+                <div class="row"><label>Auto Exposure</label><label class="toggle"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked);updateAeUI()"><span></span></label></div>
+                <div class="row ae-manual"><label>Exposure µs</label><input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)"><span class="val mono" id="v-exposure">20000</span></div>
+                <div class="row ae-manual"><label>Gain</label><input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)"><span class="val mono" id="v-gain">1.0</span></div>
+                <div class="row ae-auto"><label>EV Comp</label><input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)"><span class="val mono" id="v-ev">0.0</span></div>
+                <div class="row ae-auto"><label>Metering</label><select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)"><option value="CentreWeighted" selected>Centre-Weighted</option><option value="Spot">Spot</option><option value="Matrix">Matrix</option></select></div>
+                <div class="row ae-auto"><label>Mode</label><select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)"><option value="Normal" selected>Normal</option><option value="Short">Short</option><option value="Long">Long</option></select></div>
             </div>
-            <div class="meter-bar-container"><div id="meter-fill" class="meter-bar"></div></div>
-        </div>
+        </details>
 
-        <div class="action-row">
-            <button class="warning" id="btn-refocus" onclick="triggerSpotFocus(targetX, targetY)">🎯 Re-focus</button>
-            <button class="warning" id="btn-broad" onclick="triggerSpotFocus(targetX, targetY, true)">🌐 Broad</button>
-            <button class="nudge" onclick="nudgeFocus(-0.20)">-0.20</button>
-            <button class="nudge" onclick="nudgeFocus(-0.05)">-0.05</button>
-            <div class="focus-row">
-                <label style="font-size:0.78rem;color:#aaa;">Focus:</label>
-                <input type="range" id="focus-slider" min="0" max="3200" value="160" oninput="onFocusSlider(this.value)">
-                <span id="focus-label" class="val">1.60</span><span style="font-size:0.7rem;color:#666;">dpt</span>
+        <details class="panel" open>
+            <summary class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+                White Balance
+            </summary>
+            <div class="panel-body">
+                <div class="row"><label>Auto WB</label><label class="toggle"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked);updateAwbUI()"><span></span></label></div>
+                <div class="row awb-auto"><label>Preset</label><select id="sel-awb" onchange="setCtrl('AwbMode',this.value)"><option value="Auto" selected>Auto</option><option value="Daylight">Daylight</option><option value="Cloudy">Cloudy</option><option value="Tungsten">Tungsten</option><option value="Fluorescent">Fluorescent</option><option value="Indoor">Indoor</option><option value="Incandescent">Incandescent</option></select></div>
+                <div class="row awb-manual"><label>Red Gain</label><input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)"><span class="val mono" id="v-rgain">2.00</span></div>
+                <div class="row awb-manual"><label>Blue Gain</label><input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)"><span class="val mono" id="v-bgain">2.00</span></div>
             </div>
-            <button class="nudge" onclick="nudgeFocus(0.05)">+0.05</button>
-            <button class="nudge" onclick="nudgeFocus(0.20)">+0.20</button>
-            <button class="success" id="btn-snap" onclick="capture16MP()">📸 16MP</button>
-            <button id="btn-rec" onclick="toggleRecording()">⏺ Record</button>
-            <a class="btn" id="btn-dl" href="/download_latest" target="_blank" style="display:none;background:#455a64;">⬇️ View</a>
-        </div>
+        </details>
 
-        <!-- ─── Control Panels ─── -->
-        <div class="controls-grid">
-            <!-- Exposure -->
-            <details class="ctrl-section" open>
-                <summary>📷 Exposure</summary>
-                <div class="ctrl-body">
-                    <div class="ctrl-row">
-                        <label>Auto Exposure</label>
-                        <label class="switch"><input type="checkbox" id="ae-enable" checked onchange="setCtrl('AeEnable',this.checked); updateAeUI()"><span class="sl"></span></label>
-                    </div>
-                    <div class="ctrl-row ae-manual">
-                        <label>Exposure (µs)</label>
-                        <input type="range" id="sl-exposure" min="0" max="1000" value="500" oninput="onExposureSlider(this.value)">
-                        <span class="val" id="v-exposure">20000</span>
-                    </div>
-                    <div class="ctrl-row ae-manual">
-                        <label>Analogue Gain</label>
-                        <input type="range" id="sl-gain" min="10" max="160" value="10" oninput="onSlider('AnalogueGain',this.value/10,'v-gain',1)">
-                        <span class="val" id="v-gain">1.0</span>
-                    </div>
-                    <div class="ctrl-row ae-auto">
-                        <label>EV Comp</label>
-                        <input type="range" id="sl-ev" min="-80" max="80" value="0" oninput="onSlider('ExposureValue',this.value/10,'v-ev',1)">
-                        <span class="val" id="v-ev">0.0</span>
-                    </div>
-                    <div class="ctrl-row ae-auto">
-                        <label>Metering</label>
-                        <select id="sel-metering" onchange="setCtrl('AeMeteringMode',this.value)">
-                            <option value="CentreWeighted" selected>Centre-Weighted</option>
-                            <option value="Spot">Spot</option>
-                            <option value="Matrix">Matrix</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-row ae-auto">
-                        <label>Exposure Mode</label>
-                        <select id="sel-aemode" onchange="setCtrl('AeExposureMode',this.value)">
-                            <option value="Normal" selected>Normal</option>
-                            <option value="Short">Short</option>
-                            <option value="Long">Long</option>
-                        </select>
-                    </div>
-                </div>
-            </details>
+        <details class="panel" open>
+            <summary class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 00-5 5v10a5 5 0 005 5h10a5 5 0 005-5V7a5 5 0 00-5-5z"/></svg>
+                Image
+            </summary>
+            <div class="panel-body">
+                <div class="row"><label>Brightness</label><input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)"><span class="val mono" id="v-brightness">0.00</span></div>
+                <div class="row"><label>Contrast</label><input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)"><span class="val mono" id="v-contrast">1.00</span></div>
+                <div class="row"><label>Saturation</label><input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)"><span class="val mono" id="v-saturation">1.00</span></div>
+                <div class="row"><label>Sharpness</label><input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)"><span class="val mono" id="v-sharpness">1.00</span></div>
+            </div>
+        </details>
 
-            <!-- White Balance -->
-            <details class="ctrl-section" open>
-                <summary>⚪ White Balance</summary>
-                <div class="ctrl-body">
-                    <div class="ctrl-row">
-                        <label>Auto WB</label>
-                        <label class="switch"><input type="checkbox" id="awb-enable" checked onchange="setCtrl('AwbEnable',this.checked); updateAwbUI()"><span class="sl"></span></label>
-                    </div>
-                    <div class="ctrl-row awb-auto">
-                        <label>WB Mode</label>
-                        <select id="sel-awb" onchange="setCtrl('AwbMode',this.value)">
-                            <option value="Auto" selected>Auto</option>
-                            <option value="Daylight">Daylight</option>
-                            <option value="Cloudy">Cloudy</option>
-                            <option value="Tungsten">Tungsten</option>
-                            <option value="Fluorescent">Fluorescent</option>
-                            <option value="Indoor">Indoor</option>
-                            <option value="Incandescent">Incandescent</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-row awb-manual">
-                        <label>Red Gain</label>
-                        <input type="range" id="sl-rgain" min="0" max="800" value="200" oninput="onSlider('ColourGainRed',this.value/100,'v-rgain',2)">
-                        <span class="val" id="v-rgain">2.00</span>
-                    </div>
-                    <div class="ctrl-row awb-manual">
-                        <label>Blue Gain</label>
-                        <input type="range" id="sl-bgain" min="0" max="800" value="200" oninput="onSlider('ColourGainBlue',this.value/100,'v-bgain',2)">
-                        <span class="val" id="v-bgain">2.00</span>
-                    </div>
-                </div>
-            </details>
-
-            <!-- Image Processing -->
-            <details class="ctrl-section" open>
-                <summary>🎨 Image Processing</summary>
-                <div class="ctrl-body">
-                    <div class="ctrl-row">
-                        <label>Brightness</label>
-                        <input type="range" id="sl-brightness" min="-100" max="100" value="0" oninput="onSlider('Brightness',this.value/100,'v-brightness',2)">
-                        <span class="val" id="v-brightness">0.00</span>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>Contrast</label>
-                        <input type="range" id="sl-contrast" min="0" max="400" value="100" oninput="onSlider('Contrast',this.value/100,'v-contrast',2)">
-                        <span class="val" id="v-contrast">1.00</span>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>Saturation</label>
-                        <input type="range" id="sl-saturation" min="0" max="400" value="100" oninput="onSlider('Saturation',this.value/100,'v-saturation',2)">
-                        <span class="val" id="v-saturation">1.00</span>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>Sharpness</label>
-                        <input type="range" id="sl-sharpness" min="0" max="800" value="100" oninput="onSlider('Sharpness',this.value/100,'v-sharpness',2)">
-                        <span class="val" id="v-sharpness">1.00</span>
-                    </div>
-                </div>
-            </details>
-
-            <!-- Advanced -->
-            <details class="ctrl-section">
-                <summary>🔧 Advanced</summary>
-                <div class="ctrl-body">
-                    <div class="ctrl-row">
-                        <label>Noise Reduc.</label>
-                        <select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)">
-                            <option value="0" selected>Off</option>
-                            <option value="1">Fast</option>
-                            <option value="2">High Quality</option>
-                            <option value="3">Minimal</option>
-                            <option value="4">ZSL</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>HDR Mode</label>
-                        <select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)">
-                            <option value="0" selected>Off</option>
-                            <option value="1">Single Exposure</option>
-                            <option value="2">Multi Exposure</option>
-                            <option value="4">Night</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>Resolution</label>
-                        <select id="sel-res" onchange="changeResolution(this.value)">
-                            <option value="640x480">640×480</option>
-                            <option value="1280x720" selected>1280×720</option>
-                            <option value="1920x1080">1920×1080</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-row">
-                        <label>Digital Zoom</label>
-                        <input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)">
-                        <span class="val" id="v-zoom">1.0×</span>
-                    </div>
-                    <div class="ctrl-row" style="justify-content:flex-end; margin-top:8px;">
-                        <button style="background:#616161;font-size:0.75rem;" onclick="resetDefaults()">↺ Reset All Defaults</button>
-                    </div>
-                </div>
-            </details>
-        </div>
-
-        <div id="status-msg"></div>
+        <details class="panel">
+            <summary class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                Advanced
+            </summary>
+            <div class="panel-body">
+                <div class="row"><label>Denoise</label><select id="sel-nr" onchange="setCtrl('NoiseReductionMode',this.value)"><option value="0" selected>Off</option><option value="1">Fast</option><option value="2">High Quality</option><option value="3">Minimal</option><option value="4">ZSL</option></select></div>
+                <div class="row"><label>HDR</label><select id="sel-hdr" onchange="setCtrl('HdrMode',this.value)"><option value="0" selected>Off</option><option value="1">Single Exposure</option><option value="2">Multi Exposure</option><option value="4">Night</option></select></div>
+                <div class="row"><label>Resolution</label><select id="sel-res" onchange="changeResolution(this.value)"><option value="640x480">640 × 480</option><option value="1280x720" selected>1280 × 720</option><option value="1920x1080">1920 × 1080</option></select></div>
+                <div class="row"><label>Zoom</label><input type="range" id="sl-zoom" min="100" max="400" value="100" oninput="onSlider('DigitalZoom',this.value/100,'v-zoom',1)"><span class="val mono" id="v-zoom">1.0x</span></div>
+                <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn btn-sm" onclick="resetDefaults()">Reset All Defaults</button></div>
+            </div>
+        </details>
     </div>
 
-    <!-- ═══ GALLERY TAB ═══ -->
-    <div id="tab-gallery" class="tab-content">
-        <div class="gallery-bar">
-            <select id="gallery-sort" onchange="loadGallery()">
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="largest">Largest First</option>
-                <option value="name">By Name</option>
-            </select>
-            <select id="gallery-type" onchange="loadGallery()">
-                <option value="all">All Files</option>
-                <option value="image">Images Only</option>
-                <option value="video">Videos Only</option>
-            </select>
-            <button style="font-size:0.75rem;background:#37474f;" onclick="loadGallery()">🔄 Refresh</button>
-            <span class="stats" id="gallery-stats"></span>
-        </div>
-        <div class="gallery-grid" id="gallery-grid"></div>
-    </div>
+    <div id="status-msg"></div>
+</div>
 
-    <!-- ═══ Lightbox ═══ -->
-    <div class="lightbox" id="lightbox">
-        <div class="lightbox-close" onclick="closeLightbox()">&times;</div>
-        <div class="lightbox-content" id="lightbox-content"></div>
-        <div class="lightbox-bar">
-            <span id="lb-name"></span>
-            <span id="lb-size" style="color:#888;"></span>
-            <a id="lb-download" href="#" download>⬇️ Download</a>
-            <button style="background:#c62828;font-size:0.78rem;" id="lb-delete" onclick="deleteLightboxFile()">🗑️ Delete</button>
-        </div>
+<!-- ═══ GALLERY TAB ═══ -->
+<div id="tab-gallery" class="tab-content">
+    <div class="gallery-toolbar">
+        <select id="gallery-sort" onchange="loadGallery()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest First</option><option value="name">By Name</option></select>
+        <select id="gallery-type" onchange="loadGallery()"><option value="all">All Files</option><option value="image">Images Only</option><option value="video">Videos Only</option></select>
+        <button class="btn btn-sm" onclick="loadGallery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Refresh</button>
+        <span class="stats" id="gallery-stats"></span>
     </div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+</div>
+
+<!-- ═══ Lightbox ═══ -->
+<div class="lb" id="lightbox">
+    <button class="lb-close" onclick="closeLightbox()">&times;</button>
+    <div class="lb-body" id="lightbox-content"></div>
+    <div class="lb-bar">
+        <span id="lb-name"></span>
+        <span id="lb-size" style="color:var(--text3)"></span>
+        <a id="lb-download" href="#" download>Download</a>
+        <button class="btn btn-danger btn-sm" id="lb-delete" onclick="deleteLightboxFile()">Delete</button>
+    </div>
+</div>
 
 <script>
-/* ═══ Constants & State ═══ */
-const canvas = document.getElementById('view-canvas');
-const ctx = canvas.getContext('2d');
-const hud = document.getElementById('hud');
-const container = document.getElementById('container');
-const reticle = document.getElementById('reticle');
-const statusMsg = document.getElementById('status-msg');
-const recBadge = document.getElementById('rec-badge');
+const canvas=document.getElementById('view-canvas'),ctx=canvas.getContext('2d'),hud=document.getElementById('hud'),container=document.getElementById('container'),reticle=document.getElementById('reticle'),statusMsg=document.getElementById('status-msg'),recBadge=document.getElementById('rec-badge');
+let frameCount=0,lastFpsTime=performance.now(),fps=0,targetX=.5,targetY=.5,isBusy=false,isRecording=false,currentLightboxFile=null,debounceTimers={},pollingPaused=false;
 
-let frameCount = 0, lastFpsTime = performance.now(), fps = 0;
-let targetX = 0.50, targetY = 0.50;
-let isBusy = false, isRecording = false;
-let currentLightboxFile = null;
-let debounceTimers = {};
+function switchTab(n,b){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');b.classList.add('active');if(n==='gallery')loadGallery()}
 
-/* ═══ Tabs ═══ */
-function switchTab(name, btn) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    btn.classList.add('active');
-    if (name === 'gallery') loadGallery();
-}
+function setCtrl(n,v){clearTimeout(debounceTimers[n]);debounceTimers[n]=setTimeout(()=>{fetch('/api/set_control?name='+encodeURIComponent(n)+'&value='+encodeURIComponent(v))},40)}
+function onSlider(n,v,id,d){const el=document.getElementById(id);let t=parseFloat(v).toFixed(d);if(n==='DigitalZoom')t+='x';el.innerText=t;setCtrl(n,v)}
+function sliderToExposure(v){return Math.round(Math.exp(v/1000*Math.log(66666)))}
+function exposureToSlider(e){return e<=1?0:Math.round(Math.log(e)/Math.log(66666)*1000)}
+function onExposureSlider(v){const us=sliderToExposure(parseInt(v));document.getElementById('v-exposure').innerText=us;setCtrl('ExposureTime',us)}
+function onFocusSlider(v){const d=(v/100).toFixed(2);document.getElementById('focus-label').innerText=d;setCtrl('LensPosition',d)}
+function nudgeFocus(d){let c=parseFloat(document.getElementById('focus-label').innerText)||0;let v=Math.max(0,Math.min(32,c+d));document.getElementById('focus-label').innerText=v.toFixed(2);document.getElementById('focus-slider').value=Math.round(v*100);setCtrl('LensPosition',v.toFixed(2))}
 
-/* ═══ Debounced Control Setter ═══ */
-function setCtrl(name, value) {
-    clearTimeout(debounceTimers[name]);
-    debounceTimers[name] = setTimeout(() => {
-        fetch('/api/set_control?name=' + encodeURIComponent(name) + '&value=' + encodeURIComponent(value));
-    }, 40);
-}
+function updateAeUI(){const ae=document.getElementById('ae-enable').checked;document.querySelectorAll('.ae-manual').forEach(r=>{r.querySelectorAll('input,select').forEach(el=>el.disabled=ae);r.style.opacity=ae?'.35':'1'});document.querySelectorAll('.ae-auto').forEach(r=>{r.querySelectorAll('input,select').forEach(el=>el.disabled=!ae);r.style.opacity=ae?'1':'.35'})}
+function updateAwbUI(){const a=document.getElementById('awb-enable').checked;document.querySelectorAll('.awb-auto').forEach(r=>{r.querySelectorAll('input,select').forEach(el=>el.disabled=!a);r.style.opacity=a?'1':'.35'});document.querySelectorAll('.awb-manual').forEach(r=>{r.querySelectorAll('input,select').forEach(el=>el.disabled=a);r.style.opacity=a?'.35':'1'})}
+updateAeUI();updateAwbUI();
 
-function onSlider(name, value, displayId, decimals) {
-    const v = parseFloat(value);
-    const el = document.getElementById(displayId);
-    let txt = v.toFixed(decimals);
-    if (name === 'DigitalZoom') txt += '\u00d7';
-    el.innerText = txt;
-    setCtrl(name, v);
-}
+container.addEventListener('click',e=>{if(isBusy)return;const r=container.getBoundingClientRect();targetX=Math.max(.05,Math.min(.95,(e.clientX-r.left)/r.width));targetY=Math.max(.05,Math.min(.95,(e.clientY-r.top)/r.height));reticle.style.left=(targetX*100)+'%';reticle.style.top=(targetY*100)+'%';triggerSpotFocus(targetX,targetY)});
 
-/* ═══ Exposure Slider (Logarithmic) ═══ */
-function sliderToExposure(val) {
-    return Math.round(Math.exp(val / 1000 * Math.log(66666)));
-}
-function exposureToSlider(exp) {
-    if (exp <= 1) return 0;
-    return Math.round(Math.log(exp) / Math.log(66666) * 1000);
-}
-function onExposureSlider(val) {
-    const us = sliderToExposure(parseInt(val));
-    document.getElementById('v-exposure').innerText = us;
-    setCtrl('ExposureTime', us);
-}
+function triggerSpotFocus(x,y,broad=false){if(isBusy)return;isBusy=true;reticle.className='reticle focusing';hud.className='hud busy';hud.innerText='Focusing ['+Math.round(x*100)+'%, '+Math.round(y*100)+'%]...';statusMsg.innerText='Running '+(broad?'broad':'precision')+' focus sweep...';setControlsDisabled(true);fetch('/api/focus_spot?x='+x.toFixed(3)+'&y='+y.toFixed(3)+(broad?'&broad=1':'')).then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);reticle.className='reticle focused';hud.className='hud';hud.innerText='Focused: '+d.best_focus.toFixed(2)+' dpt | Score: '+d.score;document.getElementById('focus-label').innerText=d.best_focus.toFixed(2);document.getElementById('focus-slider').value=Math.round(d.best_focus*100);statusMsg.innerText='Focus locked at '+d.best_focus.toFixed(2)+' dpt (Score: '+d.score+') in '+d.duration+'s';setTimeout(()=>{reticle.className='reticle'},1500)}).catch(err=>{isBusy=false;setControlsDisabled(false);reticle.className='reticle';hud.className='hud';statusMsg.innerText='Focus failed: '+err})}
+function setControlsDisabled(d){document.querySelectorAll('.actions .btn').forEach(b=>b.disabled=d)}
 
-/* ═══ Focus Slider ═══ */
-function onFocusSlider(val) {
-    const dpt = (val / 100).toFixed(2);
-    document.getElementById('focus-label').innerText = dpt;
-    setCtrl('LensPosition', dpt);
-}
-function nudgeFocus(delta) {
-    let cur = parseFloat(document.getElementById('focus-label').innerText) || 0;
-    let v = Math.max(0, Math.min(32, cur + delta));
-    document.getElementById('focus-label').innerText = v.toFixed(2);
-    document.getElementById('focus-slider').value = Math.round(v * 100);
-    setCtrl('LensPosition', v.toFixed(2));
-}
+function capture16MP(){if(isBusy)return;isBusy=true;statusMsg.innerText='Capturing 16MP still...';hud.innerText='Capturing...';setControlsDisabled(true);fetch('/api/capture_16mp').then(r=>r.json()).then(d=>{isBusy=false;setControlsDisabled(false);hud.innerText=d.size_mb+' MB captured';statusMsg.innerText='Saved: '+d.name+' ('+d.size_mb+' MB) in '+d.duration+'s';document.getElementById('btn-dl').style.display='inline-flex';document.getElementById('btn-dl').href='/download_latest?t='+Date.now()}).catch(err=>{isBusy=false;setControlsDisabled(false);statusMsg.innerText='Capture error: '+err})}
 
-/* ═══ AE / AWB UI Toggle ═══ */
-function updateAeUI() {
-    const ae = document.getElementById('ae-enable').checked;
-    document.querySelectorAll('.ae-manual').forEach(r => {
-        r.querySelectorAll('input,select').forEach(el => el.disabled = ae);
-        r.style.opacity = ae ? '0.4' : '1';
-    });
-    document.querySelectorAll('.ae-auto').forEach(r => {
-        r.querySelectorAll('input,select').forEach(el => el.disabled = !ae);
-        r.style.opacity = ae ? '1' : '0.4';
-    });
-}
-function updateAwbUI() {
-    const awb = document.getElementById('awb-enable').checked;
-    document.querySelectorAll('.awb-auto').forEach(r => {
-        r.querySelectorAll('input,select').forEach(el => el.disabled = !awb);
-        r.style.opacity = awb ? '1' : '0.4';
-    });
-    document.querySelectorAll('.awb-manual').forEach(r => {
-        r.querySelectorAll('input,select').forEach(el => el.disabled = awb);
-        r.style.opacity = awb ? '0.4' : '1';
-    });
-}
-updateAeUI(); updateAwbUI();
+function toggleRecording(){if(isRecording){fetch('/api/record_stop').then(r=>r.json()).then(d=>{isRecording=false;recBadge.style.display='none';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>Record';b.classList.remove('btn-danger');statusMsg.innerText='Video saved: '+(d.name||'')+' ('+d.size_mb+' MB)'})}else{fetch('/api/record_start').then(r=>r.json()).then(d=>{if(d.status==='ok'){isRecording=true;recBadge.style.display='flex';const b=document.getElementById('btn-rec');b.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop';b.classList.add('btn-danger');statusMsg.innerText='Recording...'}else{statusMsg.innerText='Record error: '+d.message}})}}
 
-/* ═══ Click-to-Focus ═══ */
-container.addEventListener('click', (e) => {
-    if (isBusy) return;
-    const rect = container.getBoundingClientRect();
-    targetX = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / rect.width));
-    targetY = Math.max(0.05, Math.min(0.95, (e.clientY - rect.top) / rect.height));
-    reticle.style.left = (targetX * 100) + '%';
-    reticle.style.top = (targetY * 100) + '%';
-    triggerSpotFocus(targetX, targetY);
-});
+function changeResolution(v){const[w,h]=v.split('x').map(Number);statusMsg.innerText='Switching to '+w+'\u00d7'+h+'...';fetch('/api/resolution?width='+w+'&height='+h).then(r=>r.json()).then(d=>{statusMsg.innerText='Resolution: '+d.resolution[0]+'\u00d7'+d.resolution[1]}).catch(err=>{statusMsg.innerText='Error: '+err})}
+function resetDefaults(){fetch('/api/reset_defaults').then(r=>r.json()).then(()=>{statusMsg.innerText='All controls reset';setTimeout(syncControlsFromServer,200)})}
 
-function triggerSpotFocus(x, y, broad = false) {
-    if (isBusy) return;
-    isBusy = true;
-    reticle.className = 'reticle focusing';
-    hud.className = 'hud-overlay busy';
-    hud.innerText = '🎯 Autofocusing [' + Math.round(x*100) + '%, ' + Math.round(y*100) + '%]...';
-    statusMsg.innerText = 'Running ' + (broad ? 'broad' : 'precision') + ' focus sweep...';
-    setControlsDisabled(true);
+function syncControlsFromServer(){fetch('/api/controls').then(r=>r.json()).then(d=>{document.getElementById('ae-enable').checked=d.AeEnable;document.getElementById('awb-enable').checked=d.AwbEnable;document.getElementById('sel-awb').value=d.AwbMode;document.getElementById('sel-metering').value=d.AeMeteringMode;document.getElementById('sel-aemode').value=d.AeExposureMode;document.getElementById('sel-nr').value=d.NoiseReductionMode;document.getElementById('sel-hdr').value=d.HdrMode;document.getElementById('sl-brightness').value=Math.round(d.Brightness*100);document.getElementById('v-brightness').innerText=d.Brightness.toFixed(2);document.getElementById('sl-contrast').value=Math.round(d.Contrast*100);document.getElementById('v-contrast').innerText=d.Contrast.toFixed(2);document.getElementById('sl-saturation').value=Math.round(d.Saturation*100);document.getElementById('v-saturation').innerText=d.Saturation.toFixed(2);document.getElementById('sl-sharpness').value=Math.round(d.Sharpness*100);document.getElementById('v-sharpness').innerText=d.Sharpness.toFixed(2);document.getElementById('sl-gain').value=Math.round(d.AnalogueGain*10);document.getElementById('v-gain').innerText=d.AnalogueGain.toFixed(1);document.getElementById('sl-ev').value=Math.round(d.ExposureValue*10);document.getElementById('v-ev').innerText=d.ExposureValue.toFixed(1);document.getElementById('sl-exposure').value=exposureToSlider(d.ExposureTime);document.getElementById('v-exposure').innerText=d.ExposureTime;document.getElementById('sl-rgain').value=Math.round(d.ColourGainRed*100);document.getElementById('v-rgain').innerText=d.ColourGainRed.toFixed(2);document.getElementById('sl-bgain').value=Math.round(d.ColourGainBlue*100);document.getElementById('v-bgain').innerText=d.ColourGainBlue.toFixed(2);document.getElementById('sl-zoom').value=Math.round(d.DigitalZoom*100);document.getElementById('v-zoom').innerText=d.DigitalZoom.toFixed(1)+'x';document.getElementById('focus-slider').value=Math.round(d.focus*100);document.getElementById('focus-label').innerText=d.focus.toFixed(2);const rv=d.resolution[0]+'x'+d.resolution[1];const rs=document.getElementById('sel-res');if([...rs.options].some(o=>o.value===rv))rs.value=rv;updateAeUI();updateAwbUI()}).catch(()=>{})}
 
-    fetch('/api/focus_spot?x=' + x.toFixed(3) + '&y=' + y.toFixed(3) + (broad ? '&broad=1' : ''))
-        .then(r => r.json())
-        .then(data => {
-            isBusy = false; setControlsDisabled(false);
-            reticle.className = 'reticle focused';
-            hud.className = 'hud-overlay';
-            hud.innerText = '\u2705 Focused: ' + data.best_focus.toFixed(2) + ' dpt | Sharpness: ' + data.score;
-            document.getElementById('focus-label').innerText = data.best_focus.toFixed(2);
-            document.getElementById('focus-slider').value = Math.round(data.best_focus * 100);
-            statusMsg.innerText = 'Focus locked at ' + data.best_focus.toFixed(2) + ' dpt (Score: ' + data.score + ') in ' + data.duration + 's';
-            setTimeout(() => { reticle.className = 'reticle'; }, 1200);
-        })
-        .catch(err => {
-            isBusy = false; setControlsDisabled(false);
-            reticle.className = 'reticle'; hud.className = 'hud-overlay';
-            statusMsg.innerText = 'Focus failed: ' + err;
-        });
-}
-function setControlsDisabled(d) {
-    document.querySelectorAll('.action-row button').forEach(b => b.disabled = d);
-}
-
-/* ═══ 16MP Capture ═══ */
-function capture16MP() {
-    if (isBusy) return;
-    isBusy = true;
-    statusMsg.innerText = 'Capturing 16MP still (4656\u00d73496)...';
-    hud.innerText = '📸 Capturing...';
-    setControlsDisabled(true);
-    fetch('/api/capture_16mp').then(r => r.json()).then(d => {
-        isBusy = false; setControlsDisabled(false);
-        hud.innerText = '📸 ' + d.size_mb + ' MB captured';
-        statusMsg.innerText = '\u2705 Saved: ' + d.name + ' (' + d.size_mb + ' MB) in ' + d.duration + 's';
-        document.getElementById('btn-dl').style.display = 'inline-flex';
-        document.getElementById('btn-dl').href = '/download_latest?t=' + Date.now();
-    }).catch(err => {
-        isBusy = false; setControlsDisabled(false);
-        statusMsg.innerText = 'Capture error: ' + err;
-    });
-}
-
-/* ═══ Recording ═══ */
-function toggleRecording() {
-    if (isRecording) {
-        fetch('/api/record_stop').then(r => r.json()).then(d => {
-            isRecording = false;
-            recBadge.style.display = 'none';
-            document.getElementById('btn-rec').innerText = '\u23fa Record';
-            document.getElementById('btn-rec').style.background = '';
-            statusMsg.innerText = '\u2705 Video saved: ' + (d.name || '') + ' (' + d.size_mb + ' MB)';
-        });
-    } else {
-        fetch('/api/record_start').then(r => r.json()).then(d => {
-            if (d.status === 'ok') {
-                isRecording = true;
-                recBadge.style.display = 'block';
-                document.getElementById('btn-rec').innerText = '\u23f9 Stop';
-                document.getElementById('btn-rec').style.background = '#c62828';
-                statusMsg.innerText = 'Recording...';
-            } else {
-                statusMsg.innerText = 'Record error: ' + d.message;
-            }
-        });
-    }
-}
-
-/* ═══ Resolution ═══ */
-function changeResolution(val) {
-    const [w, h] = val.split('x').map(Number);
-    statusMsg.innerText = 'Switching to ' + w + '\u00d7' + h + '...';
-    fetch('/api/resolution?width=' + w + '&height=' + h).then(r => r.json()).then(d => {
-        statusMsg.innerText = '\u2705 Resolution: ' + d.resolution[0] + '\u00d7' + d.resolution[1];
-    }).catch(err => { statusMsg.innerText = 'Resolution error: ' + err; });
-}
-
-/* ═══ Reset Defaults ═══ */
-function resetDefaults() {
-    fetch('/api/reset_defaults').then(r => r.json()).then(() => {
-        statusMsg.innerText = '\u2705 All controls reset to defaults';
-        // Refresh UI state from server
-        setTimeout(syncControlsFromServer, 200);
-    });
-}
-
-/* ═══ Sync UI from Server ═══ */
-function syncControlsFromServer() {
-    fetch('/api/controls').then(r => r.json()).then(d => {
-        document.getElementById('ae-enable').checked = d.AeEnable;
-        document.getElementById('awb-enable').checked = d.AwbEnable;
-        document.getElementById('sel-awb').value = d.AwbMode;
-        document.getElementById('sel-metering').value = d.AeMeteringMode;
-        document.getElementById('sel-aemode').value = d.AeExposureMode;
-        document.getElementById('sel-nr').value = d.NoiseReductionMode;
-        document.getElementById('sel-hdr').value = d.HdrMode;
-        document.getElementById('sl-brightness').value = Math.round(d.Brightness * 100);
-        document.getElementById('v-brightness').innerText = d.Brightness.toFixed(2);
-        document.getElementById('sl-contrast').value = Math.round(d.Contrast * 100);
-        document.getElementById('v-contrast').innerText = d.Contrast.toFixed(2);
-        document.getElementById('sl-saturation').value = Math.round(d.Saturation * 100);
-        document.getElementById('v-saturation').innerText = d.Saturation.toFixed(2);
-        document.getElementById('sl-sharpness').value = Math.round(d.Sharpness * 100);
-        document.getElementById('v-sharpness').innerText = d.Sharpness.toFixed(2);
-        document.getElementById('sl-gain').value = Math.round(d.AnalogueGain * 10);
-        document.getElementById('v-gain').innerText = d.AnalogueGain.toFixed(1);
-        document.getElementById('sl-ev').value = Math.round(d.ExposureValue * 10);
-        document.getElementById('v-ev').innerText = d.ExposureValue.toFixed(1);
-        document.getElementById('sl-exposure').value = exposureToSlider(d.ExposureTime);
-        document.getElementById('v-exposure').innerText = d.ExposureTime;
-        document.getElementById('sl-rgain').value = Math.round(d.ColourGainRed * 100);
-        document.getElementById('v-rgain').innerText = d.ColourGainRed.toFixed(2);
-        document.getElementById('sl-bgain').value = Math.round(d.ColourGainBlue * 100);
-        document.getElementById('v-bgain').innerText = d.ColourGainBlue.toFixed(2);
-        document.getElementById('sl-zoom').value = Math.round(d.DigitalZoom * 100);
-        document.getElementById('v-zoom').innerText = d.DigitalZoom.toFixed(1) + '\u00d7';
-        document.getElementById('focus-slider').value = Math.round(d.focus * 100);
-        document.getElementById('focus-label').innerText = d.focus.toFixed(2);
-        const resVal = d.resolution[0] + 'x' + d.resolution[1];
-        const resSel = document.getElementById('sel-res');
-        if ([...resSel.options].some(o => o.value === resVal)) resSel.value = resVal;
-        updateAeUI(); updateAwbUI();
-    }).catch(() => {});
-}
-
-/* ═══ MJPEG Stream Reader ═══ */
-async function startStream() {
-    try {
-        const response = await fetch('/stream.mjpg');
-        const reader = response.body.getReader();
-        let buffer = new Uint8Array(0);
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            const newBuf = new Uint8Array(buffer.length + value.length);
-            newBuf.set(buffer); newBuf.set(value, buffer.length);
-            buffer = newBuf;
-            let soi = -1, eoi = -1;
-            for (let i = 0; i < buffer.length - 1; i++) {
-                if (buffer[i] === 0xFF && buffer[i+1] === 0xD8) soi = i;
-                if (soi !== -1 && buffer[i] === 0xFF && buffer[i+1] === 0xD9) { eoi = i + 2; break; }
-            }
-            if (soi !== -1 && eoi !== -1) {
-                const frameBytes = buffer.slice(soi, eoi);
-                buffer = buffer.slice(eoi);
-                const blob = new Blob([frameBytes], {type: 'image/jpeg'});
-                createImageBitmap(blob).then(bmp => {
-                    if (canvas.width !== bmp.width) { canvas.width = bmp.width; canvas.height = bmp.height; }
-                    ctx.drawImage(bmp, 0, 0); bmp.close();
-                    frameCount++;
-                    const now = performance.now();
-                    if (now - lastFpsTime >= 1000) {
-                        fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
-                        frameCount = 0; lastFpsTime = now;
-                        if (!isBusy) hud.innerText = 'FPS: ' + fps + ' | Spot: [' + Math.round(targetX*100) + '%, ' + Math.round(targetY*100) + '%]';
-                    }
-                }).catch(() => {});
-            }
-            if (buffer.length > 250000) buffer = new Uint8Array(0);
-        }
-    } catch (err) { setTimeout(startStream, 800); }
-}
+async function startStream(){try{const response=await fetch('/stream.mjpg');const reader=response.body.getReader();let buffer=new Uint8Array(0);while(true){const{done,value}=await reader.read();if(done)break;const nb=new Uint8Array(buffer.length+value.length);nb.set(buffer);nb.set(value,buffer.length);buffer=nb;let soi=-1,eoi=-1;for(let i=0;i<buffer.length-1;i++){if(buffer[i]===0xFF&&buffer[i+1]===0xD8)soi=i;if(soi!==-1&&buffer[i]===0xFF&&buffer[i+1]===0xD9){eoi=i+2;break}}if(soi!==-1&&eoi!==-1){const fb=buffer.slice(soi,eoi);buffer=buffer.slice(eoi);const blob=new Blob([fb],{type:'image/jpeg'});createImageBitmap(blob).then(bmp=>{if(canvas.width!==bmp.width){canvas.width=bmp.width;canvas.height=bmp.height}ctx.drawImage(bmp,0,0);bmp.close();frameCount++;const now=performance.now();if(now-lastFpsTime>=1000){fps=Math.round((frameCount*1000)/(now-lastFpsTime));frameCount=0;lastFpsTime=now;if(!isBusy)hud.innerText=fps+' fps'}}).catch(()=>{})}if(buffer.length>250000)buffer=new Uint8Array(0)}}catch(err){setTimeout(startStream,800)}}
 startStream();
 
-/* ═══ Metrics Polling (doesn't fight sliders) ═══ */
-let pollingPaused = false;
-function updateMetrics() {
-    if (isBusy || pollingPaused) return;
-    fetch('/api/metrics').then(r => r.json()).then(d => {
-        document.getElementById('sharp-val').innerText = d.sharpness;
-        document.getElementById('peak-val').innerText = d.peak;
-        let pct = Math.min(100, (d.sharpness / Math.max(d.peak, 1)) * 100);
-        document.getElementById('meter-fill').style.width = pct + '%';
-        // Update actual exposure/gain readouts when AE is on
-        if (document.getElementById('ae-enable').checked && d.actual_exposure) {
-            document.getElementById('v-exposure').innerText = d.actual_exposure;
-            document.getElementById('v-gain').innerText = d.actual_gain.toFixed(1);
-        }
-        if (document.getElementById('awb-enable').checked && d.actual_colour_gains) {
-            document.getElementById('v-rgain').innerText = d.actual_colour_gains[0].toFixed(2);
-            document.getElementById('v-bgain').innerText = d.actual_colour_gains[1].toFixed(2);
-        }
-    }).catch(() => {});
-}
-setInterval(updateMetrics, 500);
-
-// Pause polling while user is interacting with sliders
-document.querySelectorAll('input[type=range]').forEach(sl => {
-    sl.addEventListener('mousedown', () => { pollingPaused = true; });
-    sl.addEventListener('touchstart', () => { pollingPaused = true; });
-});
-document.addEventListener('mouseup', () => { setTimeout(() => { pollingPaused = false; }, 300); });
-document.addEventListener('touchend', () => { setTimeout(() => { pollingPaused = false; }, 300); });
-
-// Initial sync
+function updateMetrics(){if(isBusy||pollingPaused)return;fetch('/api/metrics').then(r=>r.json()).then(d=>{document.getElementById('sharp-val').innerText=d.sharpness;document.getElementById('peak-val').innerText=d.peak;let pct=Math.min(100,(d.sharpness/Math.max(d.peak,1))*100);document.getElementById('meter-fill').style.width=pct+'%';if(document.getElementById('ae-enable').checked&&d.actual_exposure){document.getElementById('v-exposure').innerText=d.actual_exposure;document.getElementById('v-gain').innerText=d.actual_gain.toFixed(1)}if(document.getElementById('awb-enable').checked&&d.actual_colour_gains){document.getElementById('v-rgain').innerText=d.actual_colour_gains[0].toFixed(2);document.getElementById('v-bgain').innerText=d.actual_colour_gains[1].toFixed(2)}}).catch(()=>{})}
+setInterval(updateMetrics,500);
+document.querySelectorAll('input[type=range]').forEach(sl=>{sl.addEventListener('mousedown',()=>{pollingPaused=true});sl.addEventListener('touchstart',()=>{pollingPaused=true})});
+document.addEventListener('mouseup',()=>{setTimeout(()=>{pollingPaused=false},300)});document.addEventListener('touchend',()=>{setTimeout(()=>{pollingPaused=false},300)});
 syncControlsFromServer();
 
-/* ═══ Gallery ═══ */
-function loadGallery() {
-    fetch('/api/media').then(r => r.json()).then(files => {
-        const sort = document.getElementById('gallery-sort').value;
-        const typeFilter = document.getElementById('gallery-type').value;
-        if (typeFilter !== 'all') files = files.filter(f => f.type === typeFilter);
-        if (sort === 'oldest') files.sort((a,b) => a.mtime - b.mtime);
-        else if (sort === 'largest') files.sort((a,b) => b.size - a.size);
-        else if (sort === 'name') files.sort((a,b) => a.name.localeCompare(b.name));
-        // else newest (default from server)
+function loadGallery(){fetch('/api/media').then(r=>r.json()).then(files=>{const sort=document.getElementById('gallery-sort').value;const tf=document.getElementById('gallery-type').value;if(tf!=='all')files=files.filter(f=>f.type===tf);if(sort==='oldest')files.sort((a,b)=>a.mtime-b.mtime);else if(sort==='largest')files.sort((a,b)=>b.size-a.size);else if(sort==='name')files.sort((a,b)=>a.name.localeCompare(b.name));const totalMB=files.reduce((s,f)=>s+f.size_mb,0).toFixed(1);document.getElementById('gallery-stats').innerText=files.length+' files \u00b7 '+totalMB+' MB';const grid=document.getElementById('gallery-grid');grid.innerHTML='';if(!files.length){grid.innerHTML='<div class="empty">No media files found</div>';return}files.forEach(f=>{const c=document.createElement('div');c.className='m-card';const iv=f.type==='video';c.innerHTML='<div class="m-thumb" onclick="openLightbox(\''+f.name.replace(/'/g,"\\'")+'\','+iv+')"><img src="/api/thumb/'+encodeURIComponent(f.name)+'" loading="lazy" onerror="this.style.display=\'none\'">'+(iv?'<div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>':'')+'</div><div class="m-info"><div class="m-name" title="'+f.name+'">'+f.name+'</div><div class="m-meta">'+f.size_mb+' MB \u00b7 '+f.date+'</div></div><div class="m-actions"><a class="btn" href="/media/'+encodeURIComponent(f.name)+'" download>Download</a><button class="btn btn-danger" onclick="event.stopPropagation();deleteFile(\''+f.name.replace(/'/g,"\\'")+'\')">Delete</button></div>';grid.appendChild(c)})}).catch(err=>{document.getElementById('gallery-grid').innerHTML='<div class="empty">Error loading gallery</div>'})}
 
-        const totalMB = files.reduce((s,f) => s + f.size_mb, 0).toFixed(1);
-        document.getElementById('gallery-stats').innerText = files.length + ' files \u00b7 ' + totalMB + ' MB';
-
-        const grid = document.getElementById('gallery-grid');
-        grid.innerHTML = '';
-        if (files.length === 0) {
-            grid.innerHTML = '<div class="empty-gallery">No media files found</div>';
-            return;
-        }
-        files.forEach(f => {
-            const card = document.createElement('div');
-            card.className = 'media-card';
-            const isVid = f.type === 'video';
-            card.innerHTML =
-                '<div class="thumb-wrap" onclick="openLightbox(\'' + f.name.replace(/'/g, "\\'") + '\',' + isVid + ')">' +
-                    '<img src="/api/thumb/' + encodeURIComponent(f.name) + '" loading="lazy" onerror="this.style.display=\'none\'">' +
-                    (isVid ? '<div class="play-icon">\u25b6</div>' : '') +
-                '</div>' +
-                '<div class="media-info">' +
-                    '<span class="media-name" title="' + f.name + '">' + f.name + '</span>' +
-                    '<span class="media-meta">' + f.size_mb + ' MB \u00b7 ' + f.date + '</span>' +
-                '</div>' +
-                '<div class="media-actions">' +
-                    '<a href="/media/' + encodeURIComponent(f.name) + '" download>\u2b07\ufe0f Download</a>' +
-                    '<button class="del" onclick="event.stopPropagation();deleteFile(\'' + f.name.replace(/'/g, "\\'") + '\')">\ud83d\uddd1\ufe0f Delete</button>' +
-                '</div>';
-            grid.appendChild(card);
-        });
-    }).catch(err => {
-        document.getElementById('gallery-grid').innerHTML = '<div class="empty-gallery">Error loading gallery: ' + err + '</div>';
-    });
-}
-
-/* ═══ Lightbox ═══ */
-function openLightbox(name, isVideo) {
-    currentLightboxFile = name;
-    const content = document.getElementById('lightbox-content');
-    const url = '/media/' + encodeURIComponent(name);
-    if (isVideo) {
-        content.innerHTML = '<video src="' + url + '" controls autoplay style="max-width:100%;max-height:80vh;"></video>';
-    } else {
-        content.innerHTML = '<img src="' + url + '">';
-    }
-    document.getElementById('lb-name').innerText = name;
-    document.getElementById('lb-download').href = url;
-    document.getElementById('lb-download').download = name;
-    document.getElementById('lightbox').classList.add('open');
-    // Fetch size
-    fetch('/api/media').then(r=>r.json()).then(files => {
-        const f = files.find(x => x.name === name);
-        if (f) document.getElementById('lb-size').innerText = f.size_mb + ' MB \u00b7 ' + f.date;
-    });
-}
-function closeLightbox() {
-    document.getElementById('lightbox').classList.remove('open');
-    document.getElementById('lightbox-content').innerHTML = '';
-    currentLightboxFile = null;
-}
-function deleteLightboxFile() {
-    if (!currentLightboxFile) return;
-    if (!confirm('Delete ' + currentLightboxFile + '?')) return;
-    fetch('/api/delete_media?file=' + encodeURIComponent(currentLightboxFile)).then(r=>r.json()).then(d => {
-        if (d.status === 'ok') { closeLightbox(); loadGallery(); statusMsg.innerText = 'Deleted ' + currentLightboxFile; }
-        else statusMsg.innerText = 'Delete error: ' + d.message;
-    });
-}
-function deleteFile(name) {
-    if (!confirm('Delete ' + name + '?')) return;
-    fetch('/api/delete_media?file=' + encodeURIComponent(name)).then(r=>r.json()).then(d => {
-        if (d.status === 'ok') { loadGallery(); statusMsg.innerText = 'Deleted ' + name; }
-        else statusMsg.innerText = 'Delete error: ' + d.message;
-    });
-}
-
-// Close lightbox on Escape key
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+function openLightbox(n,iv){currentLightboxFile=n;const c=document.getElementById('lightbox-content');const u='/media/'+encodeURIComponent(n);c.innerHTML=iv?'<video src="'+u+'" controls autoplay style="max-width:100%;max-height:80vh"></video>':'<img src="'+u+'">';document.getElementById('lb-name').innerText=n;document.getElementById('lb-download').href=u;document.getElementById('lb-download').download=n;document.getElementById('lightbox').classList.add('open');fetch('/api/media').then(r=>r.json()).then(files=>{const f=files.find(x=>x.name===n);if(f)document.getElementById('lb-size').innerText=f.size_mb+' MB \u00b7 '+f.date})}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.getElementById('lightbox-content').innerHTML='';currentLightboxFile=null}
+function deleteLightboxFile(){if(!currentLightboxFile||!confirm('Delete '+currentLightboxFile+'?'))return;fetch('/api/delete_media?file='+encodeURIComponent(currentLightboxFile)).then(r=>r.json()).then(d=>{if(d.status==='ok'){closeLightbox();loadGallery();statusMsg.innerText='Deleted'}else statusMsg.innerText='Error: '+d.message})}
+function deleteFile(n){if(!confirm('Delete '+n+'?'))return;fetch('/api/delete_media?file='+encodeURIComponent(n)).then(r=>r.json()).then(d=>{if(d.status==='ok'){loadGallery();statusMsg.innerText='Deleted '+n}else statusMsg.innerText='Error: '+d.message})}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox()});
 </script>
 </body>
 </html>
 """
-
-
-# ═══════════════════════════════════════════════════════════════
 # HTTP Handler
 # ═══════════════════════════════════════════════════════════════
 
