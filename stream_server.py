@@ -24,6 +24,9 @@ from picamera2.encoders import LibavMjpegEncoder
 from picamera2.outputs import FileOutput
 from libcamera import controls, Transform
 
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 mimetypes.add_type("font/woff2", ".woff2")
 
@@ -618,6 +621,132 @@ def get_timelapse_status():
         "total_size_mb": round(total_size / (1024 * 1024), 2),
         "current_file": os.path.basename(timelapse_state["current_file"]) if timelapse_state["current_file"] else None
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# HuggingFace Backup
+# ═══════════════════════════════════════════════════════════════
+
+HF_BACKUP_INTERVAL = 3600  # seconds (1 hour)
+HF_MANIFEST_FILE = os.path.join(MEDIA_DIR, ".hf_uploaded.json")
+HF_BACKUP_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mkv', '.mov'}
+
+
+def _hf_load_manifest():
+    """Load the set of already-uploaded file paths."""
+    if os.path.exists(HF_MANIFEST_FILE):
+        try:
+            with open(HF_MANIFEST_FILE, 'r') as f:
+                return set(json.load(f))
+        except Exception:
+            pass
+    return set()
+
+
+def _hf_save_manifest(uploaded):
+    """Save the set of uploaded file paths."""
+    try:
+        with open(HF_MANIFEST_FILE, 'w') as f:
+            json.dump(sorted(uploaded), f)
+    except Exception as e:
+        logging.warning("☁️ [Backup] Could not save manifest: %s", e)
+
+
+def _hf_collect_files():
+    """Collect all media files from MEDIA_DIR and timelapse/."""
+    files = []
+    # Main media dir (non-recursive)
+    for fname in os.listdir(MEDIA_DIR):
+        fpath = os.path.join(MEDIA_DIR, fname)
+        if os.path.isfile(fpath) and os.path.splitext(fname)[1].lower() in HF_BACKUP_EXTS:
+            files.append(fpath)
+    # Timelapse dir
+    tl_dir = os.path.join(MEDIA_DIR, "timelapse")
+    if os.path.isdir(tl_dir):
+        for fname in os.listdir(tl_dir):
+            fpath = os.path.join(tl_dir, fname)
+            if os.path.isfile(fpath) and os.path.splitext(fname)[1].lower() in HF_BACKUP_EXTS:
+                files.append(fpath)
+    return files
+
+
+def hf_backup_now():
+    """Run a single backup cycle: upload new files to HuggingFace."""
+    token = os.environ.get("HF_TOKEN")
+    repo_id = os.environ.get("HF_REPO", "ThomasTheMaker/MicroScope-v1")
+    if not token:
+        logging.warning("☁️ [Backup] No HF_TOKEN in .env — skipping backup")
+        return {"status": "error", "message": "No HF_TOKEN configured"}
+
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=token)
+    except Exception as e:
+        logging.error("☁️ [Backup] Could not init HfApi: %s", e)
+        return {"status": "error", "message": str(e)}
+
+    # Ensure the dataset repo exists
+    try:
+        api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
+    except Exception as e:
+        logging.warning("☁️ [Backup] create_repo: %s", e)
+
+    uploaded = _hf_load_manifest()
+    all_files = _hf_collect_files()
+    new_files = [f for f in all_files if f not in uploaded]
+
+    if not new_files:
+        logging.info("☁️ [Backup] No new files to upload")
+        return {"status": "ok", "uploaded": 0, "total_tracked": len(uploaded)}
+
+    logging.info("☁️ [Backup] Uploading %d new files to %s...", len(new_files), repo_id)
+    success_count = 0
+    for fpath in new_files:
+        # Skip files currently being written (timelapse in progress)
+        if timelapse_active and timelapse_state.get("current_file") == fpath:
+            continue
+        # Skip files currently being recorded
+        if recording_active and recording_filename == fpath:
+            continue
+
+        fname = os.path.basename(fpath)
+        # Organize in HF: images/ videos/ timelapse/
+        if "timelapse" in fpath:
+            path_in_repo = f"timelapse/{fname}"
+        elif os.path.splitext(fname)[1].lower() in VIDEO_EXTS:
+            path_in_repo = f"videos/{fname}"
+        else:
+            path_in_repo = f"images/{fname}"
+
+        try:
+            api.upload_file(
+                path_or_fileobj=fpath,
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type="dataset",
+            )
+            uploaded.add(fpath)
+            success_count += 1
+            logging.info("☁️ [Backup] Uploaded: %s → %s", fname, path_in_repo)
+        except Exception as e:
+            logging.error("☁️ [Backup] Failed to upload %s: %s", fname, e)
+
+    _hf_save_manifest(uploaded)
+    logging.info("☁️ [Backup] Done: %d/%d files uploaded", success_count, len(new_files))
+    return {"status": "ok", "uploaded": success_count, "failed": len(new_files) - success_count,
+            "total_tracked": len(uploaded)}
+
+
+def _hf_backup_loop():
+    """Background thread: run backup every HF_BACKUP_INTERVAL seconds."""
+    # Wait 60s after startup before first backup
+    time.sleep(60)
+    while True:
+        try:
+            hf_backup_now()
+        except Exception as e:
+            logging.error("☁️ [Backup] Unexpected error: %s", e)
+        time.sleep(HF_BACKUP_INTERVAL)
 
 
 def change_resolution(width, height):
@@ -1821,6 +1950,11 @@ class StreamingHandler(BaseHTTPRequestHandler):
         elif path == "/api/media":
             self._json_response(list_media_files())
 
+        # ─── API: HF Backup ───
+        elif path == "/api/backup":
+            res = hf_backup_now()
+            self._json_response(res)
+
         # ─── API: Thumbnail ───
         elif path.startswith("/api/thumb/"):
             filename = unquote(path[11:])
@@ -1911,6 +2045,15 @@ def main():
     logging.info("  Microscope Control Station READY")
     logging.info("  http://0.0.0.0:1306")
     logging.info("═══════════════════════════════════════")
+
+    # Start HF backup daemon
+    if os.environ.get("HF_TOKEN"):
+        backup_thread = threading.Thread(target=_hf_backup_loop, daemon=True)
+        backup_thread.start()
+        logging.info("☁️ [Backup] HF auto-backup enabled (every %ds → %s)",
+                     HF_BACKUP_INTERVAL, os.environ.get("HF_REPO", "ThomasTheMaker/MicroScope-v1"))
+    else:
+        logging.info("☁️ [Backup] HF_TOKEN not set — auto-backup disabled")
 
     try:
         server.serve_forever()
