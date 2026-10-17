@@ -98,6 +98,15 @@ recording_filename = None
 current_resolution = (2328, 1748)
 current_qp = 10  # MJPEG quality: lower=better image, higher=faster stream (3-31)
 
+# Timelapse state
+timelapse_active = False
+timelapse_thread = None
+timelapse_state = {
+    "fps": 1, "duration_hours": 1, "frames_captured": 0,
+    "started_at": None, "segment_files": [], "current_file": None,
+    "elapsed_seconds": 0
+}
+
 MEDIA_DIR = "/home/thomas/microscope"
 THUMB_DIR = os.path.join(MEDIA_DIR, ".thumbs")
 MEDIA_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
@@ -436,6 +445,179 @@ def stop_recording():
         size_mb = round(os.path.getsize(recording_filename) / (1024 * 1024), 2)
     return {"status": "ok", "file": recording_filename, "name": os.path.basename(recording_filename),
             "size_mb": size_mb}
+
+
+# ═══════════════════════════════════════════════════════════════
+# Timelapse Recording
+# ═══════════════════════════════════════════════════════════════
+
+TIMELAPSE_DIR = os.path.join(MEDIA_DIR, "timelapse")
+TIMELAPSE_SEGMENT_HOURS = 2  # Start a new file every N hours
+
+
+def start_timelapse(fps, duration_hours):
+    """Start a timelapse recording at the given FPS for the given duration."""
+    global timelapse_active, timelapse_thread, timelapse_state
+    if timelapse_active:
+        return {"status": "error", "message": "Timelapse already running"}
+    if recording_active:
+        return {"status": "error", "message": "Stop regular recording first"}
+
+    fps = max(0.01, min(30, fps))  # 0.01 fps = 1 frame per 100s
+    duration_hours = max(0.01, min(720, duration_hours))  # Up to 30 days
+
+    os.makedirs(TIMELAPSE_DIR, exist_ok=True)
+    session_id = int(time.time())
+
+    timelapse_state = {
+        "fps": fps, "duration_hours": duration_hours, "frames_captured": 0,
+        "started_at": time.time(), "segment_files": [],
+        "current_file": None, "elapsed_seconds": 0, "session_id": session_id,
+        "total_frames": int(fps * duration_hours * 3600),
+        "status": "running"
+    }
+    timelapse_active = True
+    timelapse_thread = threading.Thread(target=_timelapse_worker, args=(fps, duration_hours, session_id), daemon=True)
+    timelapse_thread.start()
+
+    logging.info("🎬 [Timelapse] Started: %.2f fps for %.1f hours (%d total frames)",
+                 fps, duration_hours, timelapse_state["total_frames"])
+    return {"status": "ok", "fps": fps, "duration_hours": duration_hours,
+            "total_frames": timelapse_state["total_frames"]}
+
+
+def _timelapse_new_segment(session_id, seg_num, fps):
+    """Start a new ffmpeg segment file and return the Popen process."""
+    filename = os.path.join(TIMELAPSE_DIR, f"timelapse_{session_id}_seg{seg_num:03d}.mp4")
+    playback_fps = min(30, max(1, int(fps * 30))) if fps >= 1 else 30
+    proc = subprocess.Popen([
+        'ffmpeg', '-y', '-f', 'image2pipe', '-framerate', str(playback_fps),
+        '-vcodec', 'mjpeg', '-i', 'pipe:0',
+        '-vcodec', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart', filename
+    ], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    timelapse_state["current_file"] = filename
+    timelapse_state["segment_files"].append(filename)
+    logging.info("🎬 [Timelapse] New segment: %s (playback %d fps)", os.path.basename(filename), playback_fps)
+    return proc, filename
+
+
+def _timelapse_worker(fps, duration_hours, session_id):
+    """Worker thread that captures frames at the specified interval."""
+    global timelapse_active
+    interval = 1.0 / fps
+    total_seconds = duration_hours * 3600
+    seg_num = 0
+    proc = None
+
+    try:
+        proc, _ = _timelapse_new_segment(session_id, seg_num, fps)
+        seg_start_time = time.time()
+        start_time = time.time()
+        next_capture = start_time
+
+        while timelapse_active:
+            now = time.time()
+            elapsed = now - start_time
+            timelapse_state["elapsed_seconds"] = elapsed
+
+            if elapsed >= total_seconds:
+                logging.info("🎬 [Timelapse] Duration reached (%.1f hours)", duration_hours)
+                break
+
+            # New segment every TIMELAPSE_SEGMENT_HOURS
+            if now - seg_start_time >= TIMELAPSE_SEGMENT_HOURS * 3600:
+                if proc and proc.poll() is None:
+                    try:
+                        proc.stdin.close()
+                        proc.wait(timeout=15)
+                    except Exception:
+                        proc.kill()
+                seg_num += 1
+                proc, _ = _timelapse_new_segment(session_id, seg_num, fps)
+                seg_start_time = now
+
+            # Wait until next capture time
+            sleep_time = next_capture - time.time()
+            if sleep_time > 0:
+                while sleep_time > 0 and timelapse_active:
+                    time.sleep(min(sleep_time, 0.5))
+                    sleep_time = next_capture - time.time()
+
+            if not timelapse_active:
+                break
+
+            # Grab latest frame
+            with output.condition:
+                output.condition.wait(timeout=2.0)
+                frame = output.frame
+
+            if frame and proc and proc.poll() is None:
+                try:
+                    proc.stdin.write(frame)
+                    timelapse_state["frames_captured"] += 1
+                except BrokenPipeError:
+                    logging.error("🎬 [Timelapse] Broken pipe to ffmpeg")
+                    break
+
+            next_capture += interval
+
+    except Exception as e:
+        logging.error("🎬 [Timelapse] Error: %s", e)
+    finally:
+        if proc and proc.poll() is None:
+            try:
+                proc.stdin.close()
+                proc.wait(timeout=15)
+            except Exception:
+                proc.kill()
+        timelapse_active = False
+        timelapse_state["status"] = "finished"
+        total_size = sum(os.path.getsize(f) for f in timelapse_state["segment_files"] if os.path.exists(f))
+        logging.info("🎬 [Timelapse] Finished: %d frames, %d segments, %.1f MB total",
+                     timelapse_state["frames_captured"], len(timelapse_state["segment_files"]),
+                     total_size / (1024 * 1024))
+
+
+def stop_timelapse():
+    """Stop an active timelapse recording."""
+    global timelapse_active
+    if not timelapse_active:
+        return {"status": "error", "message": "No timelapse running"}
+    timelapse_active = False
+    if timelapse_thread:
+        timelapse_thread.join(timeout=15)
+    total_size = sum(os.path.getsize(f) for f in timelapse_state["segment_files"] if os.path.exists(f))
+    return {
+        "status": "ok", "frames_captured": timelapse_state["frames_captured"],
+        "segments": len(timelapse_state["segment_files"]),
+        "total_size_mb": round(total_size / (1024 * 1024), 2),
+        "files": [os.path.basename(f) for f in timelapse_state["segment_files"]]
+    }
+
+
+def get_timelapse_status():
+    """Get current timelapse status."""
+    if not timelapse_active and timelapse_state.get("started_at") is None:
+        return {"status": "idle"}
+    elapsed = timelapse_state.get("elapsed_seconds", 0)
+    total_seconds = timelapse_state["duration_hours"] * 3600
+    progress = min(100, (elapsed / total_seconds) * 100) if total_seconds > 0 else 0
+    total_size = sum(os.path.getsize(f) for f in timelapse_state["segment_files"] if os.path.exists(f))
+    eta_seconds = max(0, total_seconds - elapsed)
+    return {
+        "status": "running" if timelapse_active else timelapse_state.get("status", "finished"),
+        "fps": timelapse_state["fps"],
+        "duration_hours": timelapse_state["duration_hours"],
+        "frames_captured": timelapse_state["frames_captured"],
+        "total_frames": timelapse_state.get("total_frames", 0),
+        "elapsed_seconds": round(elapsed, 1),
+        "progress_pct": round(progress, 1),
+        "eta_seconds": round(eta_seconds, 0),
+        "segments": len(timelapse_state["segment_files"]),
+        "total_size_mb": round(total_size / (1024 * 1024), 2),
+        "current_file": os.path.basename(timelapse_state["current_file"]) if timelapse_state["current_file"] else None
+    }
 
 
 def change_resolution(width, height):
@@ -1234,6 +1416,22 @@ PAGE_HTML = r"""<!DOCTYPE html>
 
       <details class="s-panel">
         <summary class="s-panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Timelapse
+        </summary>
+        <div class="s-panel-body">
+          <div class="s-ctrl"><label>Capture FPS</label><input type="number" id="tl-fps" value="1" min="0.01" max="30" step="0.1" style="width:70px;background:var(--s-bg);border:1px solid var(--s-line);color:var(--s-text);padding:2px 6px;font:inherit" oninput="updateTlEstimate()"><span class="val" id="tl-fps-label">1 f/s</span></div>
+          <div class="s-ctrl"><label>Duration (hours)</label><input type="number" id="tl-hours" value="1" min="0.01" max="720" step="0.5" style="width:70px;background:var(--s-bg);border:1px solid var(--s-line);color:var(--s-text);padding:2px 6px;font:inherit" oninput="updateTlEstimate()"></div>
+          <div class="s-ctrl s-ctrl-wide" style="font-size:11px;color:var(--s-faint)"><label>Estimate</label><span id="tl-estimate">3,600 frames &middot; ~180 MB</span></div>
+          <div class="s-ctrl s-ctrl-wide" id="tl-progress-row" style="display:none"><label>Progress</label><span id="tl-progress-text">0 / 0 frames</span></div>
+          <div class="s-ctrl s-ctrl-wide" id="tl-bar-row" style="display:none"><div style="width:100%;height:4px;background:var(--s-line);border-radius:2px;overflow:hidden"><div id="tl-bar" style="width:0%;height:100%;background:var(--s-accent);transition:width 1s linear"></div></div></div>
+          <div class="s-ctrl s-ctrl-wide" id="tl-eta-row" style="display:none;font-size:11px;color:var(--s-faint)"><label>ETA</label><span id="tl-eta">—</span></div>
+          <div class="s-ctrl s-ctrl-right" style="margin-top:4px"><span></span><button class="btn" id="btn-timelapse" onclick="toggleTimelapse()" style="min-width:100px">Start Timelapse</button></div>
+        </div>
+      </details>
+
+      <details class="s-panel">
+        <summary class="s-panel-head">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           Advanced
         </summary>
@@ -1326,6 +1524,10 @@ function changeQP(v){statusMsg.innerText='Setting stream quality...';if(streamCo
 function toggleFastStream(on){statusMsg.innerText=on?'Switching to fast stream...':'Switching to quality stream...';hud.innerText='switching...';if(streamController)streamController.abort();fetch('/api/perf_mode?mode='+(on?'fast':'quality')).then(r=>r.json()).then(d=>{statusMsg.innerText=d.mode==='fast'?'Fast Stream: 1280\u00d7720 qp=20':'Quality: 2328\u00d71748 qp=10';startStream();syncControlsFromServer()}).catch(err=>{statusMsg.innerText='Error: '+err;startStream()})}
 function toggleStreamMode(fast){document.getElementById('fast-stream').checked=fast;toggleFastStream(fast);updateModeLabel(fast)}
 function updateModeLabel(fast){const ml=document.getElementById('mode-label');if(ml){ml.style.color=fast?'var(--s-faint)':'var(--s-accent)';ml.nextElementSibling.nextElementSibling.style.color=fast?'var(--s-accent)':'var(--s-faint)'}}
+function updateTlEstimate(){const fps=parseFloat(document.getElementById('tl-fps').value)||1;const hrs=parseFloat(document.getElementById('tl-hours').value)||1;const frames=Math.round(fps*hrs*3600);const mbEst=Math.round(frames*0.05);document.getElementById('tl-estimate').innerText=frames.toLocaleString()+' frames \u00b7 ~'+mbEst+' MB';document.getElementById('tl-fps-label').innerText=fps+' f/s'}
+let tlPolling=null;
+function toggleTimelapse(){const btn=document.getElementById('btn-timelapse');if(tlPolling){fetch('/api/timelapse/stop').then(r=>r.json()).then(d=>{clearInterval(tlPolling);tlPolling=null;btn.innerText='Start Timelapse';btn.classList.remove('danger');document.getElementById('tl-fps').disabled=false;document.getElementById('tl-hours').disabled=false;document.getElementById('tl-progress-row').style.display='none';document.getElementById('tl-bar-row').style.display='none';document.getElementById('tl-eta-row').style.display='none';statusMsg.innerText='Timelapse done: '+d.frames_captured+' frames, '+d.total_size_mb+' MB ('+d.segments+' segments)'})}else{const fps=parseFloat(document.getElementById('tl-fps').value)||1;const hrs=parseFloat(document.getElementById('tl-hours').value)||1;fetch('/api/timelapse/start?fps='+fps+'&hours='+hrs).then(r=>r.json()).then(d=>{if(d.status==='ok'){btn.innerText='Stop Timelapse';btn.classList.add('danger');document.getElementById('tl-fps').disabled=true;document.getElementById('tl-hours').disabled=true;document.getElementById('tl-progress-row').style.display='';document.getElementById('tl-bar-row').style.display='';document.getElementById('tl-eta-row').style.display='';statusMsg.innerText='Timelapse started: '+d.total_frames+' frames over '+d.duration_hours+'h';tlPolling=setInterval(pollTimelapse,2000)}else{statusMsg.innerText='Timelapse error: '+d.message}})}}
+function pollTimelapse(){fetch('/api/timelapse/status').then(r=>r.json()).then(d=>{document.getElementById('tl-progress-text').innerText=d.frames_captured+' / '+d.total_frames+' frames ('+d.total_size_mb+' MB)';document.getElementById('tl-bar').style.width=d.progress_pct+'%';const eta=d.eta_seconds;if(eta>3600){document.getElementById('tl-eta').innerText=Math.floor(eta/3600)+'h '+Math.floor((eta%3600)/60)+'m remaining'}else if(eta>60){document.getElementById('tl-eta').innerText=Math.floor(eta/60)+'m '+Math.floor(eta%60)+'s remaining'}else{document.getElementById('tl-eta').innerText=Math.floor(eta)+'s remaining'}if(d.status!=='running'){clearInterval(tlPolling);tlPolling=null;document.getElementById('btn-timelapse').innerText='Start Timelapse';document.getElementById('btn-timelapse').classList.remove('danger');document.getElementById('tl-fps').disabled=false;document.getElementById('tl-hours').disabled=false;statusMsg.innerText='Timelapse finished: '+d.frames_captured+' frames, '+d.total_size_mb+' MB'}}).catch(()=>{})}
 function resetDefaults(){fetch('/api/reset_defaults').then(r=>r.json()).then(()=>{statusMsg.innerText='All controls reset';setTimeout(syncControlsFromServer,200)})}
 
 function syncControlsFromServer(){fetch('/api/controls').then(r=>r.json()).then(d=>{document.getElementById('ae-enable').checked=d.AeEnable;document.getElementById('awb-enable').checked=d.AwbEnable;document.getElementById('sel-awb').value=d.AwbMode;document.getElementById('sel-metering').value=d.AeMeteringMode;document.getElementById('sel-aemode').value=d.AeExposureMode;document.getElementById('sel-nr').value=d.NoiseReductionMode;document.getElementById('sel-hdr').value=d.HdrMode;document.getElementById('sl-brightness').value=Math.round(d.Brightness*100);document.getElementById('v-brightness').innerText=d.Brightness.toFixed(2);document.getElementById('sl-contrast').value=Math.round(d.Contrast*100);document.getElementById('v-contrast').innerText=d.Contrast.toFixed(2);document.getElementById('sl-saturation').value=Math.round(d.Saturation*100);document.getElementById('v-saturation').innerText=d.Saturation.toFixed(2);document.getElementById('sl-sharpness').value=Math.round(d.Sharpness*100);document.getElementById('v-sharpness').innerText=d.Sharpness.toFixed(2);document.getElementById('sl-gain').value=Math.round(d.AnalogueGain*10);document.getElementById('v-gain').innerText=d.AnalogueGain.toFixed(1);document.getElementById('sl-ev').value=Math.round(d.ExposureValue*10);document.getElementById('v-ev').innerText=d.ExposureValue.toFixed(1);document.getElementById('sl-exposure').value=exposureToSlider(d.ExposureTime);document.getElementById('v-exposure').innerText=d.ExposureTime;document.getElementById('sl-rgain').value=Math.round(d.ColourGainRed*100);document.getElementById('v-rgain').innerText=d.ColourGainRed.toFixed(2);document.getElementById('sl-bgain').value=Math.round(d.ColourGainBlue*100);document.getElementById('v-bgain').innerText=d.ColourGainBlue.toFixed(2);document.getElementById('sl-zoom').value=Math.round(d.DigitalZoom*100);document.getElementById('v-zoom').innerText=d.DigitalZoom.toFixed(1)+'x';document.getElementById('focus-slider').value=Math.round(d.focus*100);document.getElementById('focus-label').innerText=d.focus.toFixed(2);const rv=d.resolution[0]+'x'+d.resolution[1];const rs=document.getElementById('sel-res');if([...rs.options].some(o=>o.value===rv))rs.value=rv;if(d.qp!==undefined){document.getElementById('sl-qp').value=d.qp;document.getElementById('v-qp').innerText=d.qp;const isFast=(d.qp>=20&&d.resolution[0]<=1280);document.getElementById('fast-stream').checked=isFast;document.getElementById('stream-mode-toggle').checked=isFast;updateModeLabel(isFast)}updateAeUI();updateAwbUI()}).catch(()=>{})}
@@ -1565,6 +1767,18 @@ class StreamingHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/record_stop":
             self._json_response(stop_recording())
+
+        # ─── API: Timelapse ───
+        elif path == "/api/timelapse/start":
+            fps_val = float(qs.get("fps", [1])[0])
+            hours_val = float(qs.get("hours", [1])[0])
+            self._json_response(start_timelapse(fps_val, hours_val))
+
+        elif path == "/api/timelapse/stop":
+            self._json_response(stop_timelapse())
+
+        elif path == "/api/timelapse/status":
+            self._json_response(get_timelapse_status())
 
         # ─── API: Resolution ───
         elif path == "/api/resolution":
